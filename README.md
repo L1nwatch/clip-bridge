@@ -1,2 +1,19 @@
 # clip-bridge
-Lightweight clipboard-sharing bridge that syncs copy/paste between firewall-restricted machines via HTTP polling.
+
+Electron + React desktop application for sharing clipboard contents across devices.
+
+## Development
+
+```bash
+npm install
+npm run start
+```
+
+This runs the React development server and Electron together.
+
+## Packaging
+
+```
+npm run build
+npm run package
+```
