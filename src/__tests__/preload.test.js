@@ -15,18 +15,25 @@ jest.mock('electron', () => ({
 }));
 
 describe('Preload API Integration', () => {
+  let apiObject;
+
   beforeEach(() => {
+    // Clear all mocks and module cache
     jest.clearAllMocks();
-    // Clear module cache to ensure fresh require
     delete require.cache[require.resolve('../preload')];
+    
+    // Load the preload script fresh
+    require('../preload');
+    
+    // Get the API object from the mock call
+    const calls = mockContextBridge.exposeInMainWorld.mock.calls;
+    if (calls.length > 0) {
+      [, apiObject] = calls[0];
+    }
   });
 
   test('should expose clipboard functions to main world', () => {
-    require('../preload');
-    
     expect(mockContextBridge.exposeInMainWorld).toHaveBeenCalledWith('api', expect.any(Object));
-    
-    const [, apiObject] = mockContextBridge.exposeInMainWorld.mock.calls[0];
     
     // Check that all expected methods are exposed
     expect(apiObject).toHaveProperty('getClipboard');
@@ -42,8 +49,6 @@ describe('Preload API Integration', () => {
   });
 
   test('should handle IPC invoke calls correctly', () => {
-    require('../preload');
-    const [, apiObject] = mockContextBridge.exposeInMainWorld.mock.calls[0];
     
     // Test clipboard functions
     apiObject.getClipboard();
