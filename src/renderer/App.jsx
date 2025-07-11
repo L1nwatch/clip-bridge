@@ -41,7 +41,7 @@ export default function App() {
   const [mode, setMode] = useState('server'); // 'server' or 'client'
   const [isRunning, setIsRunning] = useState(false);
   const [config, setConfig] = useState({
-    port: 8000,
+    port: 8000,  // Server mode: port to run server on, Client mode: port server is running on
     serverAddress: 'localhost',
     autoStart: false,
     logLevel: 'INFO'

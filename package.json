@@ -6,6 +6,10 @@
     "react-start": "cross-env BROWSER=none react-scripts start",
     "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
     "start": "concurrently \"npm run react-start\" \"npm run electron-start\"",
+    "start:port": "cross-env PORT=$1 npm start",
+    "start:3001": "cross-env PORT=3001 concurrently \"cross-env BROWSER=none PORT=3001 react-scripts start\" \"wait-on http://localhost:3001 && cross-env NODE_ENV=development electron .\"",
+    "start:3002": "cross-env PORT=3002 concurrently \"cross-env BROWSER=none PORT=3002 react-scripts start\" \"wait-on http://localhost:3002 && cross-env NODE_ENV=development electron .\"",
+    "start:3003": "cross-env PORT=3003 concurrently \"cross-env BROWSER=none PORT=3003 react-scripts start\" \"wait-on http://localhost:3003 && cross-env NODE_ENV=development electron .\"",
     "build": "react-scripts build",
     "package": "electron-builder",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
@@ -25,10 +29,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@types/node": "^24.0.13",
     "cross-env": "^7.0.3",
     "electron-builder": "^24.6.0",
     "eslint": "^9.30.1",
     "eslint-plugin-react": "^7.37.5",
+    "get-port": "^7.1.0",
     "globals": "^16.3.0",
     "react-scripts": "^5.0.1",
     "wait-on": "^7.0.1"

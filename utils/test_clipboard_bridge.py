@@ -37,7 +37,7 @@ class ClipboardBridgeTest(unittest.TestCase):
 
         # Start server in subprocess
         cls.server_process = subprocess.Popen(
-            [sys.executable, "server.py"],
+            [sys.executable, "utils/server.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # Redirect stderr to stdout
             preexec_fn=os.setsid,  # Create new process group

@@ -46,8 +46,11 @@ function createWindow() {
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:3000').catch(err => {
-      console.error('Failed to load development URL:', err);
+    const reactPort = process.env.PORT || '3000';
+    const reactUrl = `http://localhost:${reactPort}`;
+    
+    win.loadURL(reactUrl).catch(err => {
+      console.error(`Failed to load development URL (${reactUrl}):`, err);
       // Fallback to file if dev server is not ready
       win.loadFile(path.join(__dirname, '../public/index.html'));
     });
@@ -120,30 +123,64 @@ ipcMain.handle('start-server', async (event, config) => {
       let hasResolved = false;
       let allOutput = '';
 
+      let logBuffer = '';
+
       serverProcess.stdout.on('data', (data) => {
-        const message = data.toString();
-        allOutput += message;
-        console.log('Server stdout:', message); // Debug logging
-        event.sender.send('server-log', message);
-        if (message.includes('Server started successfully') && !hasResolved) {
-          hasResolved = true;
-          clearTimeout(timeout);
-          event.sender.send('server-status', 'running');
-          resolve({ success: true, message: 'Server started successfully' });
-        }
+        logBuffer += data.toString();
+        
+        // Split by lines and process each complete line
+        const lines = logBuffer.split('\n');
+        logBuffer = lines.pop(); // Keep the last incomplete line in buffer
+        
+        lines.forEach(line => {
+          if (line.trim()) {
+            console.log('Server stdout:', line); // Debug logging
+            event.sender.send('server-log', line + '\n');
+            if (line.includes('Server started successfully') && !hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeout);
+              event.sender.send('server-status', 'running');
+              resolve({ success: true, message: 'Server started successfully' });
+            }
+          }
+        });
       });
 
+      let errorBuffer = '';
+
       serverProcess.stderr.on('data', (data) => {
-        const errorMessage = data.toString();
-        allOutput += 'STDERR: ' + errorMessage;
-        console.log('Server stderr:', errorMessage); // Debug logging
-        event.sender.send('server-log', `ERROR: ${errorMessage}`);
-        if (!hasResolved && (errorMessage.includes('ImportError') || errorMessage.includes('ModuleNotFoundError'))) {
-          hasResolved = true;
-          clearTimeout(timeout);
-          serverProcess = null;
-          reject(new Error(`Python dependency error: ${errorMessage}`));
-        }
+        errorBuffer += data.toString();
+        
+        // Split by lines and process each complete line
+        const lines = errorBuffer.split('\n');
+        errorBuffer = lines.pop(); // Keep the last incomplete line in buffer
+        
+        lines.forEach(line => {
+          if (line.trim()) {
+            allOutput += 'STDERR: ' + line + '\n';
+            console.log('Server stderr:', line); // Debug logging
+            
+            // Only mark as ERROR if it's actually an error, not debug traces
+            if (line.includes('ERROR:') || 
+                line.includes('CRITICAL:') ||
+                line.includes('ImportError') || 
+                line.includes('ModuleNotFoundError') ||
+                line.includes('Traceback') ||
+                line.includes('Exception')) {
+              event.sender.send('server-log', `ERROR: ${line}\n`);
+            } else {
+              // Send debug/trace output without ERROR prefix
+              event.sender.send('server-log', line + '\n');
+            }
+            
+            if (!hasResolved && (line.includes('ImportError') || line.includes('ModuleNotFoundError'))) {
+              hasResolved = true;
+              clearTimeout(timeout);
+              serverProcess = null;
+              reject(new Error(`Python dependency error: ${line}`));
+            }
+          }
+        });
       });
 
       serverProcess.on('exit', (code) => {
@@ -230,7 +267,7 @@ ipcMain.handle('start-client', async (event, config) => {
       throw new Error('Client is already running');
     }
     
-    const pythonPath = path.join(__dirname, '../utils/.venv/bin/python');
+    const pythonPath = 'python3';
     const clientPath = path.join(__dirname, '../utils/client.py');
     
     clientProcess = spawn(pythonPath, [clientPath], {
@@ -238,8 +275,11 @@ ipcMain.handle('start-client', async (event, config) => {
         ...process.env,
         SERVER_HOST: config.serverAddress,
         SERVER_PORT: config.port.toString(),
-        LOG_LEVEL: config.logLevel || 'INFO'
-      }
+        LOG_LEVEL: config.logLevel || 'INFO',
+        PYTHONUNBUFFERED: '1',
+        PYTHONPATH: 'utils/.venv/lib/python3.9/site-packages'
+      },
+      cwd: path.join(__dirname, '../')
     });
 
     return new Promise((resolve, reject) => {
@@ -247,17 +287,56 @@ ipcMain.handle('start-client', async (event, config) => {
         reject(new Error('Client startup timeout'));
       }, 10000);
 
+      let clientLogBuffer = '';
+      let clientErrorBuffer = '';
+
       clientProcess.stdout.on('data', (data) => {
-        const message = data.toString();
-        event.sender.send('client-log', message);
-        if (message.includes('WebSocket connection established')) {
-          clearTimeout(timeout);
-          resolve({ success: true, message: 'Client connected successfully' });
-        }
+        clientLogBuffer += data.toString();
+        
+        // Split by lines and process each complete line
+        const lines = clientLogBuffer.split('\n');
+        clientLogBuffer = lines.pop(); // Keep the last incomplete line in buffer
+        
+        lines.forEach(line => {
+          if (line.trim()) {
+            event.sender.send('client-log', line + '\n');
+            if (line.includes('Connected to server successfully')) {
+              clearTimeout(timeout);
+              resolve({ success: true, message: 'Client connected successfully' });
+            }
+          }
+        });
       });
 
       clientProcess.stderr.on('data', (data) => {
-        event.sender.send('client-log', `ERROR: ${data.toString()}`);
+        clientErrorBuffer += data.toString();
+        
+        // Split by lines and process each complete line
+        const lines = clientErrorBuffer.split('\n');
+        clientErrorBuffer = lines.pop(); // Keep the last incomplete line in buffer
+        
+        lines.forEach(line => {
+          if (line.trim()) {
+            // Check for success message from ui_logger
+            if (line.includes('Connected to server successfully')) {
+              clearTimeout(timeout);
+              resolve({ success: true, message: 'Client connected successfully' });
+            }
+            
+            // Only mark as ERROR if it's actually an error, not debug traces
+            if (line.includes('ERROR:') || 
+                line.includes('CRITICAL:') ||
+                line.includes('ImportError') || 
+                line.includes('ModuleNotFoundError') ||
+                line.includes('Traceback') ||
+                line.includes('Exception')) {
+              event.sender.send('client-log', `ERROR: ${line}\n`);
+            } else {
+              // Send debug/trace output without ERROR prefix
+              event.sender.send('client-log', line + '\n');
+            }
+          }
+        });
       });
 
       clientProcess.on('exit', (code) => {
