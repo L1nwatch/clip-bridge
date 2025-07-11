@@ -6,6 +6,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 let serverProcess = null;
 let clientProcess = null;
+let connectedClients = new Map(); // Track connected clients: clientId -> clientInfo
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -79,6 +80,48 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
 
+// Function to parse client connection events from server logs
+function parseClientEvents(logLine, sender) {
+  try {
+    // Parse client connection: "New WebSocket connection from 127.0.0.1"
+    const connectionMatch = logLine.match(/New WebSocket connection from (\d+\.\d+\.\d+\.\d+)/);
+    if (connectionMatch) {
+      const clientAddress = connectionMatch[1];
+      const clientId = `client-${clientAddress}-${Date.now()}`;
+      const clientInfo = {
+        id: clientId,
+        address: clientAddress,
+        name: `Client-${clientAddress}`,
+        connectedAt: new Date().toLocaleTimeString()
+      };
+      
+      connectedClients.set(clientId, clientInfo);
+      console.log('Client connected:', clientInfo);
+      sender.send('client-connected', clientInfo);
+      return;
+    }
+    
+    // Parse client disconnection: "Client 127.0.0.1 disconnected. Total clients: 0"
+    const disconnectionMatch = logLine.match(/Client (\d+\.\d+\.\d+\.\d+) disconnected/);
+    if (disconnectionMatch) {
+      const clientAddress = disconnectionMatch[1];
+      
+      // Find and remove the client by address
+      for (const [clientId, clientInfo] of connectedClients.entries()) {
+        if (clientInfo.address === clientAddress) {
+          connectedClients.delete(clientId);
+          console.log('Client disconnected:', clientId);
+          sender.send('client-disconnected', clientId);
+          break;
+        }
+      }
+      return;
+    }
+  } catch (error) {
+    console.error('Error parsing client events:', error);
+  }
+}
+
 ipcMain.handle('get-clipboard', () => {
   return clipboard.readText();
 });
@@ -136,6 +179,10 @@ ipcMain.handle('start-server', async (event, config) => {
           if (line.trim()) {
             console.log('Server stdout:', line); // Debug logging
             event.sender.send('server-log', line + '\n');
+            
+            // Parse client connection events
+            parseClientEvents(line, event.sender);
+            
             if (line.includes('Server started successfully') && !hasResolved) {
               hasResolved = true;
               clearTimeout(timeout);
@@ -159,6 +206,9 @@ ipcMain.handle('start-server', async (event, config) => {
           if (line.trim()) {
             allOutput += 'STDERR: ' + line + '\n';
             console.log('Server stderr:', line); // Debug logging
+            
+            // Parse client connection events from stderr as well
+            parseClientEvents(line, event.sender);
             
             // Only mark as ERROR if it's actually an error, not debug traces
             if (line.includes('ERROR:') || 
@@ -187,6 +237,7 @@ ipcMain.handle('start-server', async (event, config) => {
         console.log('Server process exited with code:', code); // Debug logging
         console.log('All output was:', allOutput); // Debug logging
         serverProcess = null;
+        connectedClients.clear(); // Clear all connected clients when server stops
         event.sender.send('server-status', 'stopped');
         if (code !== 0 && !hasResolved) {
           hasResolved = true;
@@ -241,6 +292,7 @@ ipcMain.handle('stop-server', async () => {
       throw new Error('Server is not running');
     }
     
+    connectedClients.clear(); // Clear all connected clients when stopping server
     serverProcess.kill('SIGTERM');
     
     return new Promise((resolve) => {
@@ -384,6 +436,11 @@ ipcMain.handle('get-service-status', () => {
     server: serverProcess ? 'running' : 'stopped',
     client: clientProcess ? 'running' : 'stopped'
   };
+});
+
+ipcMain.handle('get-connected-clients', () => {
+  // Return array of connected client info
+  return Array.from(connectedClients.values());
 });
 
 // Cleanup on app quit

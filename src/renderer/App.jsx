@@ -26,6 +26,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ClearIcon from '@mui/icons-material/Clear';
 import HistoryIcon from '@mui/icons-material/History';
 import DevicesIcon from '@mui/icons-material/Devices';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -48,7 +49,7 @@ export default function App() {
   });
   const [status, setStatus] = useState('idle'); // 'idle', 'starting', 'running', 'stopping', 'error'
   const [logs, setLogs] = useState([]);
-  const [connectedDevices] = useState([]);
+  const [connectedDevices, setConnectedDevices] = useState([]);
 
   // Mock devices for demonstration
   const mockDevices = [
@@ -66,11 +67,44 @@ export default function App() {
     const removeClientLogListener = window.api?.onClientLog?.(addLog);
     const removeServerStatusListener = window.api?.onServerStatus?.((status) => {
       setStatus(status);
-      if (status === 'stopped') setIsRunning(false);
+      if (status === 'stopped') {
+        setIsRunning(false);
+        setConnectedDevices([]); // Clear connected devices when server stops
+      } else if (status === 'running') {
+        setIsRunning(true);
+      }
     });
     const removeClientStatusListener = window.api?.onClientStatus?.((status) => {
       setStatus(status);
       if (status === 'stopped') setIsRunning(false);
+    });
+
+    // Add listeners for client connections (only in server mode)
+    const removeClientConnectedListener = window.api?.onClientConnected?.((clientInfo) => {
+      setConnectedDevices(prev => {
+        // Check if client already exists (avoid duplicates)
+        const exists = prev.some(device => device.id === clientInfo.id);
+        if (exists) return prev;
+        
+        addLog(`Client connected: ${clientInfo.address || 'Unknown'}`);
+        return [...prev, {
+          id: clientInfo.id,
+          name: clientInfo.name || `Client-${clientInfo.id.slice(0, 8)}`,
+          ip: clientInfo.address || 'Unknown',
+          status: 'connected',
+          connectedAt: new Date().toLocaleTimeString()
+        }];
+      });
+    });
+
+    const removeClientDisconnectedListener = window.api?.onClientDisconnected?.((clientId) => {
+      setConnectedDevices(prev => {
+        const client = prev.find(device => device.id === clientId);
+        if (client) {
+          addLog(`Client disconnected: ${client.ip}`);
+        }
+        return prev.filter(device => device.id !== clientId);
+      });
     });
 
     // Check initial service status
@@ -78,6 +112,20 @@ export default function App() {
       if (mode === 'server' && status.server === 'running') {
         setIsRunning(true);
         setStatus('running');
+        // Get initial connected clients if any
+        window.api?.getConnectedClients?.().then(clients => {
+          if (clients && clients.length > 0) {
+            setConnectedDevices(clients.map(client => ({
+              id: client.id,
+              name: client.name || `Client-${client.id.slice(0, 8)}`,
+              ip: client.address || 'Unknown',
+              status: 'connected',
+              connectedAt: client.connectedAt || 'Unknown'
+            })));
+          }
+        }).catch(() => {
+          // Ignore error, just means no clients or API not available
+        });
       } else if (mode === 'client' && status.client === 'running') {
         setIsRunning(true);
         setStatus('running');
@@ -89,6 +137,8 @@ export default function App() {
       removeClientLogListener?.();
       removeServerStatusListener?.();
       removeClientStatusListener?.();
+      removeClientConnectedListener?.();
+      removeClientDisconnectedListener?.();
     };
   }, [mode]);
 
@@ -199,13 +249,54 @@ export default function App() {
             {mode === 'server' && (
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>Connected Clients</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6">Connected Clients</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip 
+                        label={`${connectedDevices.length} client${connectedDevices.length !== 1 ? 's' : ''}`}
+                        size="small"
+                        color={connectedDevices.length > 0 ? 'success' : 'default'}
+                      />
+                      <IconButton 
+                        size="small" 
+                        onClick={() => {
+                          // Refresh connected clients list
+                          if (isRunning && mode === 'server') {
+                            window.api?.getConnectedClients?.().then(clients => {
+                              if (clients) {
+                                setConnectedDevices(clients.map(client => ({
+                                  id: client.id,
+                                  name: client.name || `Client-${client.id.slice(0, 8)}`,
+                                  ip: client.address || 'Unknown',
+                                  status: 'connected',
+                                  connectedAt: client.connectedAt || 'Unknown'
+                                })));
+                                addLog('Refreshed client list');
+                              }
+                            }).catch(() => {
+                              addLog('Failed to refresh client list');
+                            });
+                          }
+                        }}
+                        title="Refresh client list"
+                      >
+                        <RefreshIcon />
+                      </IconButton>
+                    </Box>
+                  </Box>
                   {connectedDevices.length === 0 ? (
-                    <Alert severity="info">No clients connected</Alert>
+                    <Alert severity="info" sx={{ textAlign: 'center' }}>
+                      <Typography variant="body2">
+                        No clients connected
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {isRunning ? 'Waiting for clients to connect...' : 'Start the server to accept connections'}
+                      </Typography>
+                    </Alert>
                   ) : (
-                    <Stack spacing={1}>
-                      {connectedDevices.map((device, idx) => (
-                        <DeviceCard key={idx} {...device} />
+                    <Stack spacing={2}>
+                      {connectedDevices.map((device) => (
+                        <DeviceCard key={device.id} {...device} />
                       ))}
                     </Stack>
                   )}
@@ -217,19 +308,71 @@ export default function App() {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography variant="h6">Activity Log</Typography>
-                  <IconButton size="small" onClick={() => setLogs([])}>
-                    <RefreshIcon />
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setLogs([])} 
+                    title="Clear activity log"
+                    sx={{
+                      '&:hover': {
+                        bgcolor: 'error.light',
+                        color: 'white'
+                      }
+                    }}
+                  >
+                    <ClearIcon />
                   </IconButton>
                 </Box>
-                <Box sx={{ maxHeight: 200, overflow: 'auto', bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+                <Box sx={{ 
+                  maxHeight: 200, 
+                  overflow: 'auto', 
+                  bgcolor: 'grey.50', 
+                  p: 2, 
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'grey.200'
+                }}>
                   {logs.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">No activity yet</Typography>
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                        📋 Activity log is empty
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Server events and clipboard operations will appear here
+                      </Typography>
+                    </Box>
                   ) : (
-                    <Stack spacing={0.5}>
+                    <Stack spacing={1}>
                       {logs.map((log, idx) => (
-                        <Typography key={idx} variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                          <span style={{ color: '#666' }}>[{log.timestamp}]</span> {log.message}
-                        </Typography>
+                        <Box 
+                          key={idx}
+                          sx={{ 
+                            p: 1, 
+                            bgcolor: 'white', 
+                            borderRadius: 1, 
+                            border: '1px solid',
+                            borderColor: 'grey.100',
+                            '&:hover': {
+                              bgcolor: 'grey.25'
+                            }
+                          }}
+                        >
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.75rem',
+                              lineHeight: 1.4
+                            }}
+                          >
+                            <span style={{ color: '#666', fontSize: '0.7rem' }}>
+                              [{log.timestamp}]
+                            </span>
+                            <br />
+                            <span style={{ color: '#333' }}>
+                              {log.message}
+                            </span>
+                          </Typography>
+                        </Box>
                       ))}
                     </Stack>
                   )}
@@ -285,7 +428,7 @@ export default function App() {
           <Typography variant="h6" sx={{ flexGrow: 1 }} align="center">
             Clipboard Bridge
           </Typography>
-          <IconButton color="inherit" onClick={() => setSettingsOpen(true)}>
+          <IconButton color="inherit" onClick={() => setSettingsOpen(true)} title="Settings">
             <SettingsIcon />
           </IconButton>
         </Toolbar>

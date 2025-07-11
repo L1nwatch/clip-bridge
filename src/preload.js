@@ -28,5 +28,16 @@ contextBridge.exposeInMainWorld('api', {
   onClientStatus: (callback) => {
     ipcRenderer.on('client-status', (_, status) => callback(status));
     return () => ipcRenderer.removeAllListeners('client-status');
+  },
+  
+  // Client connection management
+  getConnectedClients: () => ipcRenderer.invoke('get-connected-clients'),
+  onClientConnected: (callback) => {
+    ipcRenderer.on('client-connected', (_, clientInfo) => callback(clientInfo));
+    return () => ipcRenderer.removeAllListeners('client-connected');
+  },
+  onClientDisconnected: (callback) => {
+    ipcRenderer.on('client-disconnected', (_, clientId) => callback(clientId));
+    return () => ipcRenderer.removeAllListeners('client-disconnected');
   }
 });

@@ -4,11 +4,12 @@ Electron + React desktop application for sharing clipboard contents across devic
 
 ## 🚀 Features
 
-- Cross-platform clipboard sharing
-- Real-time WebSocket communication
-- Modern React UI with Material-UI
-- Python backend with Flask
-- Comprehensive test coverage
+- **Cross-platform clipboard sharing** between multiple devices
+- **Real-time WebSocket communication** for instant updates
+- **Live client connection monitoring** with connected devices display
+- **Modern React UI** with Material-UI components
+- **Python backend** with Flask and WebSocket support
+- **Comprehensive test coverage** for both frontend and backend
 
 ## 🏗️ Development Setup
 
@@ -40,6 +41,22 @@ npm start
 npm run react-start    # React dev server
 npm run electron-start # Electron app
 ```
+
+### Testing Client Connections
+
+To test the Connected Clients feature, you can use the demo script:
+
+```bash
+# Start the server first through the app UI, then run:
+cd utils
+source .venv/bin/activate
+python demo_clients.py 3  # Simulate 3 test clients
+
+# Or specify custom port
+python demo_clients.py 2 8001  # 2 clients on port 8001
+```
+
+This will simulate multiple clients connecting to your server, allowing you to see the Connected Clients UI in action.
 
 ## 🧪 Testing
 
