@@ -39,18 +39,44 @@ class ClipboardBridgeTest(unittest.TestCase):
         cls.server_process = subprocess.Popen(
             [sys.executable, "server.py"],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout
             preexec_fn=os.setsid,  # Create new process group
+            text=True,
+            bufsize=1,
+            env={"PORT": "8000", "LOG_LEVEL": "INFO", **os.environ},
         )
 
-        # Wait for server to start
-        time.sleep(2)
+        # Wait for server to start and check output
+        server_started = False
+        for _ in range(30):  # Wait up to 30 seconds
+            time.sleep(1)
 
-        # Check if server is running
-        if cls.server_process.poll() is not None:
-            stdout, stderr = cls.server_process.communicate()
-            logger.error(f"Server failed to start: {stderr.decode()}")
-            raise Exception("Server failed to start")
+            # Check if process is still running
+            if cls.server_process.poll() is not None:
+                output, _ = cls.server_process.communicate()
+                logger.error(f"Server process exited early. Output: {output}")
+                raise Exception("Server failed to start")
+
+            # Test if server is responding
+            try:
+                response = requests.get("http://localhost:8000", timeout=1)
+                server_started = True
+                break
+            except requests.exceptions.ConnectionError:
+                continue
+            except Exception as e:
+                logger.warning(f"Server check failed: {e}")
+                continue
+
+        if not server_started:
+            # Try to get any output
+            try:
+                cls.server_process.terminate()
+                output, _ = cls.server_process.communicate(timeout=5)
+                logger.error(f"Server startup timeout. Output: {output}")
+            except:
+                logger.error("Server startup timeout with no output")
+            raise Exception("Server failed to start within timeout")
 
         logger.success("✅ Server started successfully for testing")
 

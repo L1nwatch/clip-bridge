@@ -5,17 +5,21 @@ from flask import Flask
 from flask_sockets import Sockets
 import subprocess
 import threading
-from datetime import datetime
+import os
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from loguru import logger
+
+# Configuration from environment variables
+PORT = int(os.environ.get("PORT", "8000"))
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 # Configure loguru
 logger.remove()  # Remove default handler
 logger.add(
     lambda msg: print(msg, end=""),
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    level="INFO",
+    level=LOG_LEVEL,
     colorize=True,
 )
 
@@ -125,17 +129,20 @@ if __name__ == "__main__":
     logger.info("=" * 50)
     logger.info("Server configuration:")
     logger.info("  - Host: 0.0.0.0")
-    logger.info("  - Port: 8000")
-    logger.info("  - WebSocket endpoint: ws://localhost:8000/ws")
-    logger.info("  - HTTP endpoint: http://localhost:8000/update_clipboard")
+    logger.info(f"  - Port: {PORT}")
+    logger.info(f"  - WebSocket endpoint: ws://localhost:{PORT}/ws")
+    logger.info(f"  - HTTP endpoint: http://localhost:{PORT}/update_clipboard")
     logger.info("=" * 50)
 
     try:
         # Run the server with WebSocket support
         server = pywsgi.WSGIServer(
-            ("0.0.0.0", 8000), app, handler_class=WebSocketHandler
+            ("0.0.0.0", PORT), app, handler_class=WebSocketHandler
         )
         logger.success("✅ Server started successfully!")
+        print(
+            "Server started successfully", flush=True
+        )  # For IPC detection with forced flush
         logger.info("Press Ctrl+C to stop the server")
         server.serve_forever()
     except KeyboardInterrupt:

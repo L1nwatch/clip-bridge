@@ -1,5 +1,6 @@
 import websocket as ws_client
 import requests
+import os
 from loguru import logger
 
 # Configure loguru
@@ -7,12 +8,15 @@ logger.remove()  # Remove default handler
 logger.add(
     lambda msg: print(msg, end=""),
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>CLIENT</cyan> - <level>{message}</level>",
-    level="INFO",
+    level=os.environ.get("LOG_LEVEL", "INFO"),
     colorize=True,
 )
 
-SERVER_URL = "ws://localhost:8000/ws"
-UPDATE_URL = "http://localhost:8000/update_clipboard"
+# Configuration from environment variables
+SERVER_HOST = os.environ.get("SERVER_HOST", "localhost")
+SERVER_PORT = os.environ.get("SERVER_PORT", "8000")
+SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}/ws"
+UPDATE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}/update_clipboard"
 
 
 def on_message(ws, message):
