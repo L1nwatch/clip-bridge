@@ -35,9 +35,13 @@ class ClipboardBridgeTest(unittest.TestCase):
         """Set up test environment - start server."""
         logger.info("🚀 Setting up test environment...")
 
+        # Get the correct path to server.py
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        server_path = os.path.join(current_dir, "server.py")
+        
         # Start server in subprocess
         cls.server_process = subprocess.Popen(
-            [sys.executable, "utils/server.py"],
+            [sys.executable, server_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # Redirect stderr to stdout
             preexec_fn=os.setsid,  # Create new process group
