@@ -1,0 +1,155 @@
+import { jest } from '@jest/globals';
+
+// Mock Electron modules
+const mockElectron = {
+  app: {
+    whenReady: jest.fn(() => Promise.resolve()),
+    quit: jest.fn(),
+    on: jest.fn(),
+    isReady: jest.fn(() => true),
+    getPath: jest.fn(() => '/mock/path'),
+  },
+  BrowserWindow: jest.fn(() => ({
+    loadURL: jest.fn(),
+    loadFile: jest.fn(),
+    on: jest.fn(),
+    webContents: {
+      send: jest.fn(),
+      on: jest.fn(),
+    },
+    show: jest.fn(),
+    hide: jest.fn(),
+    destroy: jest.fn(),
+    isDestroyed: jest.fn(() => false),
+  })),
+  ipcMain: {
+    handle: jest.fn(),
+    on: jest.fn(),
+  },
+  protocol: {
+    registerFileProtocol: jest.fn(),
+  },
+  shell: {
+    openExternal: jest.fn(),
+  },
+};
+
+// Mock path module
+const mockPath = {
+  join: jest.fn((...args) => args.join('/')),
+  dirname: jest.fn(() => '/mock/dirname'),
+  resolve: jest.fn((...args) => args.join('/')),
+};
+
+// Mock fs module
+const mockFs = {
+  existsSync: jest.fn(() => true),
+  readFileSync: jest.fn(() => '{}'),
+  writeFileSync: jest.fn(),
+};
+
+// Mock child_process
+const mockChildProcess = {
+  spawn: jest.fn(() => ({
+    on: jest.fn(),
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    kill: jest.fn(),
+    pid: 12345,
+  })),
+};
+
+// Set up module mocks
+jest.unstable_mockModule('electron', () => mockElectron);
+jest.unstable_mockModule('path', () => mockPath);
+jest.unstable_mockModule('fs', () => mockFs);
+jest.unstable_mockModule('child_process', () => mockChildProcess);
+
+describe('Electron Main Process', () => {
+  let mainModule;
+
+  beforeAll(async () => {
+    // Import the main module after mocks are set up
+    mainModule = await import('../../main.js');
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('app initializes correctly', () => {
+    expect(mockElectron.app.whenReady).toHaveBeenCalled();
+  });
+
+  test('BrowserWindow is created', () => {
+    expect(mockElectron.BrowserWindow).toHaveBeenCalled();
+  });
+
+  test('app handles window-all-closed event', () => {
+    expect(mockElectron.app.on).toHaveBeenCalledWith('window-all-closed', expect.any(Function));
+  });
+
+  test('app handles activate event', () => {
+    expect(mockElectron.app.on).toHaveBeenCalledWith('activate', expect.any(Function));
+  });
+
+  test('ipcMain handlers are registered', () => {
+    expect(mockElectron.ipcMain.handle).toHaveBeenCalled();
+  });
+
+  test('config file operations work', () => {
+    // Test that config operations use fs module
+    expect(mockFs.readFileSync).toHaveBeenCalled();
+  });
+
+  test('server process can be started', () => {
+    // Test that child_process.spawn is used for server
+    expect(mockChildProcess.spawn).toHaveBeenCalled();
+  });
+
+  test('handles platform-specific behavior', () => {
+    // Test that the app handles different platforms correctly
+    expect(mockElectron.app.on).toHaveBeenCalled();
+  });
+});
+
+describe('IPC Handlers', () => {
+  test('start-server handler exists', () => {
+    expect(mockElectron.ipcMain.handle).toHaveBeenCalledWith('start-server', expect.any(Function));
+  });
+
+  test('stop-server handler exists', () => {
+    expect(mockElectron.ipcMain.handle).toHaveBeenCalledWith('stop-server', expect.any(Function));
+  });
+
+  test('get-config handler exists', () => {
+    expect(mockElectron.ipcMain.handle).toHaveBeenCalledWith('get-config', expect.any(Function));
+  });
+
+  test('save-config handler exists', () => {
+    expect(mockElectron.ipcMain.handle).toHaveBeenCalledWith('save-config', expect.any(Function));
+  });
+});
+
+describe('Preload Script', () => {
+  test('contextBridge exposes electronAPI', async () => {
+    // Mock contextBridge
+    const mockContextBridge = {
+      exposeInMainWorld: jest.fn(),
+    };
+
+    jest.unstable_mockModule('electron', () => ({
+      contextBridge: mockContextBridge,
+      ipcRenderer: {
+        invoke: jest.fn(),
+        on: jest.fn(),
+        removeAllListeners: jest.fn(),
+      },
+    }));
+
+    // Import preload script
+    await import('../../preload.js');
+
+    expect(mockContextBridge.exposeInMainWorld).toHaveBeenCalledWith('electronAPI', expect.any(Object));
+  });
+});

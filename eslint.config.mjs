@@ -26,5 +26,24 @@ export default defineConfig([
       }
     }
   },
+  // Jest environment for test files
+  {
+    files: ["src/**/*.test.{js,jsx}", "src/**/__tests__/**/*.{js,jsx}", "src/setupTests.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.jest,
+        ...globals.node,
+        ...globals.es2021
+      }
+    }
+  },
   pluginReact.configs.flat.recommended,
+  {
+    settings: {
+      react: {
+        version: "detect"
+      }
+    }
+  }
 ]);

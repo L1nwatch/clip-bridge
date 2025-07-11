@@ -1,0 +1,60 @@
+name: Test Summary
+
+on:
+  workflow_run:
+    workflows: ["CI Tests"]
+    types:
+      - completed
+
+jobs:
+  test-summary:
+    name: Test Results Summary
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion != 'skipped' }}
+    
+    steps:
+    - name: Download Python test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-test-results-3.9
+        path: python-results/
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ github.event.workflow_run.id }}
+      continue-on-error: true
+    
+    - name: Download React test artifacts  
+      uses: actions/download-artifact@v4
+      with:
+        name: react-test-results
+        path: react-results/
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ github.event.workflow_run.id }}
+      continue-on-error: true
+    
+    - name: Create test summary
+      run: |
+        echo "## 🧪 Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ github.event.workflow_run.conclusion }}" == "success" ]; then
+          echo "✅ **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -d "python-results" ]; then
+          echo "- 🐍 **Python Tests**: Coverage reports available" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -d "react-results" ]; then
+          echo "- ⚛️ **React Tests**: Coverage reports available" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Workflow Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow**: ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.event.workflow_run.head_sha }}" >> $GITHUB_STEP_SUMMARY

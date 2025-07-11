@@ -2,18 +2,136 @@
 
 Electron + React desktop application for sharing clipboard contents across devices.
 
-## Development
+## 🚀 Features
+
+- Cross-platform clipboard sharing
+- Real-time WebSocket communication
+- Modern React UI with Material-UI
+- Python backend with Flask
+- Comprehensive test coverage
+
+## 🏗️ Development Setup
+
+### Prerequisites
+- Node.js 18+
+- Python 3.9+
+
+### Installation
 
 ```bash
+# Install Node.js dependencies
 npm install
-npm run start
+
+# Set up Python environment
+cd utils
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cd ..
 ```
 
-This runs the React development server and Electron together.
+### Running the Application
 
-## Packaging
+```bash
+# Start the full application (React + Electron)
+npm start
+
+# Or start components separately
+npm run react-start    # React dev server
+npm run electron-start # Electron app
+```
+
+## 🧪 Testing
+
+### Run All Tests
+```bash
+npm run test:all        # Both Python and React tests
+```
+
+### Python Tests
+```bash
+npm run test:python             # Run pytest
+npm run test:python:coverage    # With coverage report
+```
+
+### React Tests
+```bash
+npm run test:coverage   # React tests with coverage
+npm test               # Interactive test runner
+```
+
+### Pre-commit Validation
+```bash
+# Run the full CI validation locally
+./scripts/validate-ci.sh
+```
+
+## 📦 Building and Packaging
+
+```bash
+npm run build      # Build React app
+npm run package    # Package Electron app
+```
+
+## 🔄 Continuous Integration
+
+This project uses GitHub Actions for automated testing and quality assurance:
+
+- **Python Tests**: pytest across Python 3.9, 3.10, 3.11
+- **React Tests**: Jest with React Testing Library
+- **Code Quality**: Black, flake8, ESLint
+- **Coverage**: Comprehensive coverage reporting
+- **Integration**: End-to-end system testing
+
+See [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md) for detailed CI/CD documentation.
+
+## 📊 Test Coverage
+
+- **Python Backend**: 36 tests covering server, client, and integration
+- **React Frontend**: 17 tests covering components and user interactions
+- **Total**: 53 comprehensive tests with coverage reporting
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Electron**: Desktop application framework
+- **React**: UI library
+- **Material-UI**: Component library
+- **Jest**: Testing framework
+
+### Backend  
+- **Python**: Core language
+- **Flask**: Web framework
+- **WebSocket**: Real-time communication
+- **pytest**: Testing framework
+
+## 📁 Project Structure
 
 ```
-npm run build
-npm run package
+├── src/                          # Electron + React source
+│   ├── main.js                   # Electron main process
+│   ├── preload.js               # Electron preload script
+│   └── renderer/                # React application
+├── utils/                       # Python backend
+│   ├── server.py               # Flask server
+│   ├── client.py               # WebSocket client
+│   └── tests/                  # Python test suite
+├── .github/workflows/          # CI/CD workflows
+└── scripts/                    # Development tools
 ```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Run tests: `./scripts/validate-ci.sh`
+4. Submit a pull request
+
+All pull requests must pass the CI pipeline including:
+- All tests passing
+- Code formatting compliance
+- Coverage requirements met
+
+## 📄 License
+
+[Add your license here]
