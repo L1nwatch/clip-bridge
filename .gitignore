@@ -1,1 +1,5 @@
 node_modules
+.idea
+.history
+.venv
+.DS_Store
