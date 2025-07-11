@@ -38,7 +38,7 @@ class ClipboardBridgeTest(unittest.TestCase):
         # Get the correct path to server.py
         current_dir = os.path.dirname(os.path.abspath(__file__))
         server_path = os.path.join(current_dir, "server.py")
-        
+
         # Start server in subprocess
         cls.server_process = subprocess.Popen(
             [sys.executable, server_path],
