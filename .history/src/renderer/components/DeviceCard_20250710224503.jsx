@@ -24,8 +24,3 @@ export default function DeviceCard({ name, ip }) {
     </Card>
   );
 }
-
-DeviceCard.propTypes = {
-  name: PropTypes.string.isRequired,
-  ip: PropTypes.string.isRequired,
-};

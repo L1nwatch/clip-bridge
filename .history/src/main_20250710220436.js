@@ -10,33 +10,14 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
     },
-    show: false, // Don't show until ready
-  });
-
-  // Show window when ready to prevent visual flash
-  win.once('ready-to-show', () => {
-    win.show();
   });
 
   if (isDev) {
-    win.loadURL('http://localhost:3000').catch(err => {
-      console.error('Failed to load development URL:', err);
-      // Fallback to file if dev server is not ready
-      win.loadFile(path.join(__dirname, '../public/index.html'));
-    });
-    
-    // Open DevTools in development
-    win.webContents.openDevTools();
+    win.loadURL('http://localhost:3000');
   } else {
     win.loadFile(path.join(__dirname, '../build/index.html'));
   }
-
-  // Handle navigation errors
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    console.error('Failed to load:', errorCode, errorDescription, validatedURL);
-  });
 }
 
 app.whenReady().then(() => {

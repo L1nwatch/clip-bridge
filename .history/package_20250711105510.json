@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "main": "src/main.js",
   "scripts": {
-    "react-start": "cross-env BROWSER=none react-scripts start",
-    "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
+    "react-start": "react-scripts start",
+    "electron-start": "wait-on http://localhost:3000 && electron .",
     "start": "concurrently \"npm run react-start\" \"npm run electron-start\"",
     "build": "react-scripts build",
     "package": "electron-builder",

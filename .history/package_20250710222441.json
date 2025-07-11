@@ -3,13 +3,11 @@
   "version": "0.1.0",
   "main": "src/main.js",
   "scripts": {
-    "react-start": "cross-env BROWSER=none react-scripts start",
-    "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
+    "react-start": "react-scripts start",
+    "electron-start": "wait-on http://localhost:3000 && electron .",
     "start": "concurrently \"npm run react-start\" \"npm run electron-start\"",
     "build": "react-scripts build",
-    "package": "electron-builder",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix"
+    "package": "electron-builder"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -23,12 +21,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
-    "cross-env": "^7.0.3",
     "electron-builder": "^24.6.0",
     "eslint": "^9.30.1",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
-    "react-scripts": "^5.0.1",
+    "react-scripts": "^0.0.0",
     "wait-on": "^7.0.1"
   },
   "build": {
@@ -41,17 +38,5 @@
     "directories": {
       "buildResources": "assets"
     }
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
   }
 }
