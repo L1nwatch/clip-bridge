@@ -32,7 +32,6 @@ def websocket_connection(ws):
     """
     WebSocket connection handler for real-time communication with clients.
     """
-    global clients
     client_addr = ws.environ.get("REMOTE_ADDR", "unknown")
     logger.info(f"New WebSocket connection from {client_addr}")
 
@@ -60,7 +59,6 @@ def notify_clients():
     """
     Notify all connected clients about new clipboard content.
     """
-    global clients
     logger.info(f"Notifying {len(clients)} clients about clipboard update")
 
     with lock:

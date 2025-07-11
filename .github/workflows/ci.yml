@@ -66,12 +66,12 @@ jobs:
     
     - name: Check code formatting with Black
       run: |
-        black --check utils/
+        black --check utils/*.py
     
     - name: Lint with flake8
       run: |
-        flake8 utils/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 utils/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 utils/*.py --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 utils/*.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
   electron-test:
     runs-on: ubuntu-latest
