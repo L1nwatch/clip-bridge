@@ -1,4 +1,4 @@
-import websocket
+import websocket as ws_client
 import requests
 from loguru import logger
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     try:
-        ws = websocket.WebSocketApp(
+        ws = ws_client.WebSocketApp(
             SERVER_URL,
             on_message=on_message,
             on_open=on_open,

@@ -7,7 +7,7 @@ import unittest
 import threading
 import time
 import requests
-import websocket
+import websocket as ws_client
 import subprocess
 import sys
 import os
@@ -138,7 +138,7 @@ class ClipboardBridgeTest(unittest.TestCase):
             logger.error(f"❌ WebSocket error: {error}")
 
         try:
-            self.ws = websocket.WebSocketApp(
+            self.ws = ws_client.WebSocketApp(
                 self.websocket_url,
                 on_open=on_open,
                 on_close=on_close,
@@ -178,7 +178,7 @@ class ClipboardBridgeTest(unittest.TestCase):
             logger.error(f"❌ WebSocket error: {error}")
 
         try:
-            self.ws = websocket.WebSocketApp(
+            self.ws = ws_client.WebSocketApp(
                 self.websocket_url,
                 on_open=on_open,
                 on_message=on_message,
@@ -254,7 +254,7 @@ class ClipboardBridgeTest(unittest.TestCase):
                 logger.error(f"❌ Client {client_id} error: {error}")
                 event.set()
 
-            ws = websocket.WebSocketApp(
+            ws = ws_client.WebSocketApp(
                 self.websocket_url, on_open=on_open, on_error=on_error
             )
             connections.append(ws)
@@ -322,3 +322,7 @@ if __name__ == "__main__":
             f"❌ {len(result.failures)} failures, {len(result.errors)} errors out of {result.testsRun} tests"
         )
     logger.info("=" * 60)
+    
+    # Exit with appropriate code for CI
+    if not result.wasSuccessful():
+        sys.exit(1)
