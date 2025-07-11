@@ -322,7 +322,7 @@ if __name__ == "__main__":
             f"❌ {len(result.failures)} failures, {len(result.errors)} errors out of {result.testsRun} tests"
         )
     logger.info("=" * 60)
-    
+
     # Exit with appropriate code for CI
     if not result.wasSuccessful():
         sys.exit(1)
