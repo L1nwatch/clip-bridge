@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * @fileoverview Cross-platform script to copy Electron files for build
+ * @description This Node.js script copies main.js and preload.js to the build directory
+ * and updates package.json for Electron builds. Works on Windows, macOS, and Linux.
+ */
+
 const fs = require('fs');
 const path = require('path');
 

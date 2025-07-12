@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+/**
+ * @fileoverview Cross-platform script to clean build directories
+ * @description This Node.js script removes build and dist/electron directories.
+ * Works on Windows, macOS, and Linux.
+ */
+
 const fs = require('fs');
 const path = require('path');
 

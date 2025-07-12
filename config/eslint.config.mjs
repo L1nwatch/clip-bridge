@@ -6,9 +6,9 @@ import { defineConfig } from "eslint/config";
 
 export default defineConfig([
   { files: ["**/*.{js,mjs,cjs,jsx}"], plugins: { js }, extends: ["js/recommended"] },
-  // Node.js environment for main process files
+  // Node.js environment for main process files and build scripts
   { 
-    files: ["src/main.js", "src/preload.js"], 
+    files: ["src/main.js", "src/preload.js", "scripts/**/*.js"], 
     languageOptions: { 
       globals: {
         ...globals.node,
