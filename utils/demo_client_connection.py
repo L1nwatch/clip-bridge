@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Test script to connect a WebSocket client to the Clipboard Bridge server
+Demo script to connect a WebSocket client to the Clipboard Bridge server
 and trigger client connection events for UI testing.
+
+This is NOT a pytest test file - it's a utility script for manual testing
+of the Connected Clients UI functionality.
+
+Usage:
+    python demo_client_connection.py [duration_seconds] [port]
 """
 
 import websocket
