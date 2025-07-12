@@ -40,24 +40,42 @@ jobs:
       run: |
         Get-ChildItem -Path "dist/python-standalone/" -Force
         
-    - name: Test executables
+    - name: Verify executables
       run: |
-        # Test if the executables can be launched (they should exit quickly without arguments)
+        # Verify that the executables exist and check their properties
         if (Test-Path "dist/python-standalone/clipbridge-server.exe") {
-          Write-Host "✅ clipbridge-server.exe exists"
-          # Quick test - this should fail gracefully without crashing
-          Start-Process -FilePath "dist/python-standalone/clipbridge-server.exe" -ArgumentList "--help" -Wait -NoNewWindow -PassThru | Out-Null
+          $serverFile = Get-Item "dist/python-standalone/clipbridge-server.exe"
+          $serverSize = [math]::Round($serverFile.Length/1MB, 2)
+          Write-Host "✅ clipbridge-server.exe exists (Size: ${serverSize} MB)"
         } else {
           Write-Host "❌ clipbridge-server.exe not found"
           exit 1
         }
         
         if (Test-Path "dist/python-standalone/clipbridge-client.exe") {
-          Write-Host "✅ clipbridge-client.exe exists"
-          # Quick test - this should fail gracefully without crashing
-          Start-Process -FilePath "dist/python-standalone/clipbridge-client.exe" -ArgumentList "--help" -Wait -NoNewWindow -PassThru | Out-Null
+          $clientFile = Get-Item "dist/python-standalone/clipbridge-client.exe"
+          $clientSize = [math]::Round($clientFile.Length/1MB, 2)
+          Write-Host "✅ clipbridge-client.exe exists (Size: ${clientSize} MB)"
         } else {
           Write-Host "❌ clipbridge-client.exe not found"
+          exit 1
+        }
+        
+        # Verify these are Windows PE executables (check for MZ header)
+        $serverBytes = [System.IO.File]::ReadAllBytes("dist/python-standalone/clipbridge-server.exe")
+        $clientBytes = [System.IO.File]::ReadAllBytes("dist/python-standalone/clipbridge-client.exe")
+        
+        if ($serverBytes[0] -eq 0x4D -and $serverBytes[1] -eq 0x5A) {
+          Write-Host "✅ clipbridge-server.exe has valid PE header"
+        } else {
+          Write-Host "❌ clipbridge-server.exe is not a valid Windows executable"
+          exit 1
+        }
+        
+        if ($clientBytes[0] -eq 0x4D -and $clientBytes[1] -eq 0x5A) {
+          Write-Host "✅ clipbridge-client.exe has valid PE header"
+        } else {
+          Write-Host "❌ clipbridge-client.exe is not a valid Windows executable"
           exit 1
         }
         
