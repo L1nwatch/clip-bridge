@@ -45,7 +45,7 @@ running = True
 
 def monitor_windows_clipboard():
     """Monitor Windows clipboard for changes and send to Mac server."""
-    global last_windows_clipboard, running
+    global last_windows_clipboard
     logger.info("🔍 Starting Windows clipboard monitor...")
 
     # Initialize with current clipboard content
@@ -112,7 +112,7 @@ def on_message(ws, message):
 
 
 def on_open(ws):
-    global ws_connection, running
+    global ws_connection
     ws_connection = ws
     logger.success("🔗 Connected to Mac server successfully!")
     ui_logger.success("Connected to server successfully")  # Clean message for React UI

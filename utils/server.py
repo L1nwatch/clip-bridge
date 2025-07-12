@@ -225,7 +225,6 @@ def health_check():
 @app.route("/get_clipboard", methods=["GET"])
 def get_clipboard_content():
     """Get current clipboard content."""
-    global windows_clip
     try:
         content = get_clipboard(log_retrieval=True)  # Log when explicitly requested
         logger.info(f"Sending clipboard content: {content[:50]}...")

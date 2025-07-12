@@ -95,7 +95,10 @@ class TestClientEdgeCases:
         ) as mock_send, patch("time.sleep") as mock_sleep:
 
             # Test clipboard access error - first call succeeds, second fails
-            mock_paste.side_effect = ["initial content", Exception("Clipboard access denied")]
+            mock_paste.side_effect = [
+                "initial content",
+                Exception("Clipboard access denied"),
+            ]
             mock_sleep.side_effect = [None, Exception("Stop monitoring")]
 
             with pytest.raises(Exception, match="Stop monitoring"):
@@ -112,9 +115,9 @@ class TestClientEdgeCases:
         clipboard_sequence = [
             "initial",  # Initial content (not sent)
             "initial",  # Duplicate (not sent)
-            "content2", # New content (sent)
-            "content2", # Duplicate (not sent)
-            "content3", # New content (sent)
+            "content2",  # New content (sent)
+            "content2",  # Duplicate (not sent)
+            "content3",  # New content (sent)
         ]
         mock_paste.side_effect = clipboard_sequence
 
