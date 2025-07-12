@@ -1,7 +1,10 @@
 {
   "name": "clip-bridge",
   "version": "0.1.0",
-  "main": "src/main.js",
+  "description": "A cross-platform clipboard synchronization tool",
+  "author": "ClipBridge Team",
+  "homepage": "./",
+  "main": "build/electron.js",
   "scripts": {
     "react-start": "cross-env BROWSER=none react-scripts start",
     "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
@@ -10,7 +13,16 @@
     "start:3001": "cross-env PORT=3001 concurrently \"cross-env BROWSER=none PORT=3001 react-scripts start\" \"wait-on http://localhost:3001 && cross-env NODE_ENV=development electron .\"",
     "start:3002": "cross-env PORT=3002 concurrently \"cross-env BROWSER=none PORT=3002 react-scripts start\" \"wait-on http://localhost:3002 && cross-env NODE_ENV=development electron .\"",
     "start:3003": "cross-env PORT=3003 concurrently \"cross-env BROWSER=none PORT=3003 react-scripts start\" \"wait-on http://localhost:3003 && cross-env NODE_ENV=development electron .\"",
-    "build": "react-scripts build",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build && cp src/main.js build/electron.js && cp src/preload.js build/",
+    "electron:build": "npm run build && electron-builder",
+    "electron:dist": "npm run build && electron-builder --publish=never",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:win11": "npm run build && electron-builder --win --x64",
+    "dist:win11:full": "./build-win11.sh",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
+    "dist:clean": "./build-arm64.sh",
+    "dist:all": "npm run build && electron-builder --mac --win",
     "package": "electron-builder",
     "test": "react-scripts test",
     "test:coverage": "react-scripts test --coverage --watchAll=false",
@@ -20,7 +32,10 @@
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
     "python:activate": "source utils/.venv/bin/activate",
-    "python:install": "source utils/.venv/bin/activate && pip install -r utils/requirements.txt"
+    "python:install": "source utils/.venv/bin/activate && pip install -r utils/requirements.txt",
+    "python:build": "pyinstaller --onefile --distpath dist/python utils/server.py",
+    "python:build:win": "cd utils && pyinstaller --distpath ../dist/python server-win.spec",
+    "python:build:all": "pyinstaller --onefile --distpath dist/python --target-platform win32 utils/server.py && pyinstaller --onefile --distpath dist/python --target-platform macos utils/server.py"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
@@ -28,7 +43,6 @@
     "@mui/icons-material": "^5.11.16",
     "@mui/material": "^5.13.7",
     "concurrently": "^8.2.0",
-    "electron": "^37.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -39,6 +53,7 @@
     "@testing-library/user-event": "^14.4.3",
     "@types/node": "^24.0.13",
     "cross-env": "^7.0.3",
+    "electron": "^37.2.1",
     "electron-builder": "^24.6.0",
     "eslint": "^9.30.1",
     "eslint-plugin-react": "^7.37.5",
@@ -48,14 +63,78 @@
     "wait-on": "^7.0.1"
   },
   "build": {
-    "appId": "com.example.clipbridge",
+    "appId": "com.clipbridge.app",
+    "productName": "ClipBridge",
+    "directories": {
+      "output": "dist/electron",
+      "buildResources": "assets"
+    },
     "files": [
       "build/**/*",
       "src/main.js",
-      "src/preload.js"
+      "src/preload.js",
+      "utils/server.py",
+      "utils/client.py",
+      "utils/requirements.txt",
+      "!node_modules/**/*",
+      "!src/**/*",
+      "!utils/.venv/**/*",
+      "!coverage/**/*",
+      "!dist/**/*"
     ],
-    "directories": {
-      "buildResources": "assets"
+    "extraResources": [
+      {
+        "from": "dist/python/",
+        "to": "python/",
+        "filter": ["clipbridge-server*", "*.py", "requirements.txt"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
+      "minimumSystemVersion": "10.15"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": false,
+      "menuCategory": true,
+      "displayLanguageSelector": true,
+      "unicode": true,
+      "differentialPackage": false
     }
   },
   "browserslist": {

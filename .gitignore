@@ -1,6 +1,49 @@
-node_modules
-.idea
-.history
-.venv
+# Dependencies
+node_modules/
+*.log
+package-lock.json
+yarn.lock
+
+# Production builds
+build/
+dist/
+
+# Electron outputs
+*.dmg
+*.exe
+*.zip
+*.blockmap
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# PyInstaller
+clipbridge-server
+clipbridge-server.exe
+
+# IDEs and editors
+.idea/
+.vscode/
+.history/
+
+# Coverage
+coverage/
+*.coverage
+
+# Environment
+.env*
+
+# System files
 .DS_Store
-.vscode
+Thumbs.db
+
+# Temporary files
+*.tmp
+test-*.js
+test-*.py
+create-*.sh
+temp-*.sh

@@ -1,12 +1,94 @@
 const { app, BrowserWindow, ipcMain, clipboard } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 const isDev = process.env.NODE_ENV === 'development';
 
 let serverProcess = null;
 let clientProcess = null;
 let connectedClients = new Map(); // Track connected clients: clientId -> clientInfo
+
+// Helper functions for Python executable paths
+function getPythonExecutablePath() {
+  if (isDev) {
+    // In development, use Python from virtual environment
+    return process.platform === 'win32' ? 'python' : 'python3';
+  } else {
+    // In production, use bundled executable
+    const resourcesPath = process.resourcesPath;
+    const pythonDir = path.join(resourcesPath, 'python');
+    
+    console.log('Looking for Python executable in:', pythonDir);
+    console.log('ResourcesPath:', resourcesPath);
+    
+    if (process.platform === 'win32') {
+      const exePath = path.join(pythonDir, 'clipbridge-server.exe');
+      console.log('Checking Windows executable:', exePath);
+      if (fs.existsSync(exePath)) {
+        return exePath;
+      }
+    } else {
+      const exePath = path.join(pythonDir, 'clipbridge-server');
+      console.log('Checking macOS/Linux executable:', exePath);
+      if (fs.existsSync(exePath)) {
+        // Make sure the executable has the right permissions
+        try {
+          fs.chmodSync(exePath, '755');
+        } catch (err) {
+          console.log('Could not set executable permissions:', err);
+        }
+        return exePath;
+      }
+    }
+    
+    // Check if Python files exist as fallback
+    const serverScript = path.join(pythonDir, 'server.py');
+    console.log('Checking fallback Python script:', serverScript);
+    if (fs.existsSync(serverScript)) {
+      // Fallback to system Python with script
+      return process.platform === 'win32' ? 'python' : 'python3';
+    }
+    
+    console.log('No Python executable or script found, using system Python');
+    // Final fallback to system Python
+    return process.platform === 'win32' ? 'python' : 'python3';
+  }
+}
+
+function getPythonScriptPath() {
+  if (isDev) {
+    // In development, use the actual Python files
+    return path.join(__dirname, '..', 'utils', 'server.py');
+  } else {
+    // Check if we have a bundled executable
+    const resourcesPath = process.resourcesPath;
+    const pythonDir = path.join(resourcesPath, 'python');
+    const exeName = process.platform === 'win32' ? 'clipbridge-server.exe' : 'clipbridge-server';
+    const exePath = path.join(pythonDir, exeName);
+    
+    console.log('Checking for executable at:', exePath);
+    
+    if (fs.existsSync(exePath)) {
+      // Using executable, no script path needed
+      return null;
+    } else {
+      // Fallback to Python script
+      const scriptPath = path.join(pythonDir, 'server.py');
+      console.log('Using fallback script:', scriptPath);
+      return scriptPath;
+    }
+  }
+}
+
+function getClientScriptPath() {
+  if (isDev) {
+    return path.join(__dirname, '..', 'utils', 'client.py');
+  } else {
+    const resourcesPath = process.resourcesPath;
+    return path.join(resourcesPath, 'python', 'client.py');
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -137,22 +219,43 @@ ipcMain.handle('start-server', async (event, config) => {
       throw new Error('Server is already running');
     }
     
-    // Use system python3 with virtual environment path
-    const pythonPath = 'python3';
+    // Use helper functions to get the correct Python executable and script paths
+    const pythonPath = getPythonExecutablePath();
+    const serverScriptPath = getPythonScriptPath();
     
-    const serverPath = path.join(__dirname, '../utils/server.py');
+    console.log('Starting server with:');
+    console.log('  Python path:', pythonPath);
+    console.log('  Script path:', serverScriptPath);
+    console.log('  Is development:', isDev);
     
-    serverProcess = spawn(pythonPath, [serverPath], {
-      env: { 
-        ...process.env, 
-        PORT: config.port.toString(),
-        LOG_LEVEL: config.logLevel || 'INFO',
-        PYTHONUNBUFFERED: '1',  // Force unbuffered output
-        PYTHONPATH: 'utils/.venv/lib/python3.9/site-packages'
-      },
-      cwd: path.join(__dirname, '../'),  // Changed to parent directory so utils/ path works
-      stdio: ['pipe', 'pipe', 'pipe']  // Explicit stdio configuration
-    });
+    // Build command arguments
+    const args = serverScriptPath ? [serverScriptPath] : [];
+    
+    // Set up environment
+    const env = { 
+      ...process.env, 
+      PORT: config.port.toString(),
+      LOG_LEVEL: config.logLevel || 'INFO',
+      PYTHONUNBUFFERED: '1',  // Force unbuffered output
+    };
+    
+    // Only add PYTHONPATH in development
+    if (isDev) {
+      env.PYTHONPATH = 'utils/.venv/lib/python3.9/site-packages';
+    }
+    
+    const spawnOptions = {
+      env: env,
+      cwd: isDev ? path.join(__dirname, '../') : process.resourcesPath,
+      stdio: ['pipe', 'pipe', 'pipe']
+    };
+    
+    console.log('Spawn options:', spawnOptions);
+    console.log('Current working directory:', process.cwd());
+    console.log('Resources path:', process.resourcesPath);
+    console.log('Python executable exists:', fs.existsSync(pythonPath));
+    
+    serverProcess = spawn(pythonPath, args, spawnOptions);
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -161,7 +264,7 @@ ipcMain.handle('start-server', async (event, config) => {
           serverProcess = null;
         }
         reject(new Error('Server startup timeout'));
-      }, 15000); // Increased timeout
+      }, 60000); // Increased timeout to 60 seconds for packaged apps
 
       let hasResolved = false;
       let allOutput = '';
@@ -209,6 +312,14 @@ ipcMain.handle('start-server', async (event, config) => {
             
             // Parse client connection events from stderr as well
             parseClientEvents(line, event.sender);
+            
+            // Check for server startup success in stderr as well
+            if (line.includes('Server started successfully') && !hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeout);
+              event.sender.send('server-status', 'running');
+              resolve({ success: true, message: 'Server started successfully' });
+            }
             
             // Only mark as ERROR if it's actually an error, not debug traces
             if (line.includes('ERROR:') || 
@@ -319,19 +430,20 @@ ipcMain.handle('start-client', async (event, config) => {
       throw new Error('Client is already running');
     }
     
-    const pythonPath = 'python3';
-    const clientPath = path.join(__dirname, '../utils/client.py');
+    // Use helper functions to get the correct Python executable and script paths
+    const pythonPath = getPythonExecutablePath();
+    const clientScriptPath = getClientScriptPath();
     
-    clientProcess = spawn(pythonPath, [clientPath], {
+    clientProcess = spawn(pythonPath, [clientScriptPath], {
       env: { 
         ...process.env,
         SERVER_HOST: config.serverAddress,
         SERVER_PORT: config.port.toString(),
         LOG_LEVEL: config.logLevel || 'INFO',
         PYTHONUNBUFFERED: '1',
-        PYTHONPATH: 'utils/.venv/lib/python3.9/site-packages'
+        PYTHONPATH: isDev ? 'utils/.venv/lib/python3.9/site-packages' : undefined
       },
-      cwd: path.join(__dirname, '../')
+      cwd: isDev ? path.join(__dirname, '../') : process.resourcesPath
     });
 
     return new Promise((resolve, reject) => {
