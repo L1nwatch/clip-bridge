@@ -130,9 +130,12 @@ class TestClipboardServer:
         with server.app.test_client() as client:
             response = client.get("/")
             assert response.status_code == 200
-            assert "Clipboard Bridge Server is running" in response.get_data(
-                as_text=True
-            )
+
+            # Check for new JSON response format
+            response_data = response.get_json()
+            assert response_data["service"] == "ClipBridge Server"
+            assert response_data["status"] == "ok"
+            assert "version" in response_data
 
     def test_app_configuration(self):
         """Test Flask app configuration."""
@@ -202,6 +205,71 @@ class TestWebSocketApp:
 
         # Verify client was added and removed
         assert mock_ws not in server.websocket_clients
+
+    @mock.patch("server.set_clipboard")
+    def test_websocket_clipboard_update_message(self, mock_set_clipboard):
+        """Test WebSocket handling of clipboard_update: message format."""
+        mock_ws = MagicMock()
+        mock_ws.closed = False
+
+        # Test the new clipboard_update: message format
+        test_content = "Test clipboard content from WebSocket"
+        clipboard_message = f"clipboard_update:{test_content}"
+
+        environ = {"wsgi.websocket": mock_ws, "REMOTE_ADDR": "127.0.0.1"}
+        start_response = MagicMock()
+
+        # Set up the receive calls to return the message and then close
+        call_count = 0
+
+        def mock_receive():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return clipboard_message
+            else:
+                # Close the WebSocket after first message
+                mock_ws.closed = True
+                return None
+
+        mock_ws.receive.side_effect = mock_receive
+
+        server.websocket_app(environ, start_response)
+
+        # Verify set_clipboard was called with the extracted content
+        mock_set_clipboard.assert_called_with(test_content)
+
+    @mock.patch("server.set_clipboard")
+    def test_websocket_legacy_message_format(self, mock_set_clipboard):
+        """Test WebSocket handling of legacy message format (entire message as clipboard)."""
+        mock_ws = MagicMock()
+        mock_ws.closed = False
+
+        # Test legacy format (entire message is clipboard content)
+        test_content = "Legacy clipboard content"
+
+        environ = {"wsgi.websocket": mock_ws, "REMOTE_ADDR": "127.0.0.1"}
+        start_response = MagicMock()
+
+        # Set up the receive calls to return the message and then close
+        call_count = 0
+
+        def mock_receive():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return test_content
+            else:
+                # Close the WebSocket after first message
+                mock_ws.closed = True
+                return None
+
+        mock_ws.receive.side_effect = mock_receive
+
+        server.websocket_app(environ, start_response)
+
+        # Verify set_clipboard was called with the entire message
+        mock_set_clipboard.assert_called_with(test_content)
 
 
 if __name__ == "__main__":

@@ -64,29 +64,30 @@ class TestClientEdgeCases:
             assert result is None
 
     def test_send_clipboard_to_server_edge_cases(self):
-        """Test send_clipboard_to_server with edge cases."""
-        with patch("client.requests.post") as mock_post:
-            # Test with empty content
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_post.return_value = mock_response
+        """Test send_clipboard_to_server with edge cases using WebSocket."""
+        import client
 
-            client.send_clipboard_to_server("")
-            mock_post.assert_called_with(client.UPDATE_URL, data="", timeout=5)
+        # Mock WebSocket connection
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+        client.ws_connection = mock_ws
+        client.pending_clipboard_updates = []  # Reset pending updates
 
-            # Test with very long content
-            long_content = "x" * 10000
-            client.send_clipboard_to_server(long_content)
-            mock_post.assert_called_with(
-                client.UPDATE_URL, data=long_content, timeout=5
-            )
+        # Test with empty content
+        result = client.send_clipboard_to_server("")
+        mock_ws.send.assert_called_with("clipboard_update:")
+        assert result is True
 
-            # Test with unicode content
-            unicode_content = "Hello 世界 🌍 émojis"
-            client.send_clipboard_to_server(unicode_content)
-            mock_post.assert_called_with(
-                client.UPDATE_URL, data=unicode_content, timeout=5
-            )
+        # Test with very long content
+        long_content = "x" * 10000
+        client.send_clipboard_to_server(long_content)
+        mock_ws.send.assert_called_with(f"clipboard_update:{long_content}")
+
+        # Test with unicode content
+        unicode_content = "Hello 世界 🌍 émojis"
+        client.send_clipboard_to_server(unicode_content)
+        mock_ws.send.assert_called_with(f"clipboard_update:{unicode_content}")
 
     def test_monitor_windows_clipboard_error_handling(self):
         """Test clipboard monitoring with various error scenarios."""
@@ -298,9 +299,10 @@ class TestServerEdgeCases:
     def test_update_clipboard_endpoint_edge_cases(self):
         """Test update_clipboard endpoint with various scenarios."""
         with server.app.test_client() as client:
-            # Test with empty data
+            # Test with empty data - should return 400 as no content received
             response = client.post("/update_clipboard", data="")
-            assert response.status_code == 200
+            assert response.status_code == 400
+            assert "No content" in response.get_data(as_text=True)
 
             # Test with large data
             large_data = "x" * 100000
@@ -356,35 +358,46 @@ class TestIntegrationScenarios:
 
     @patch("pyperclip.copy")
     def test_client_server_message_flow(self, mock_copy):
-        """Test the flow of messages between client and server components."""
-        with patch("client.requests.post") as mock_post:
+        """Test the flow of messages between client and server components using WebSocket."""
+        import client
 
-            # Mock successful server response
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_post.return_value = mock_response
+        # Mock WebSocket connection for client
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+        client.ws_connection = mock_ws
+        client.pending_clipboard_updates = []  # Reset pending updates
 
-            # Test client sending to server
-            test_content = "integration test content"
-            client.send_clipboard_to_server(test_content)
+        # Test client sending to server via WebSocket
+        test_content = "integration test content"
+        result = client.send_clipboard_to_server(test_content)
 
-            mock_post.assert_called_once_with(
-                client.UPDATE_URL, data=test_content, timeout=5
-            )
+        # Verify WebSocket send was called with correct format
+        mock_ws.send.assert_called_once_with(f"clipboard_update:{test_content}")
+        assert result is True
 
-            # Test server setting clipboard
-            server.set_clipboard(test_content)
-            mock_copy.assert_called_with(test_content)
+        # Test server setting clipboard
+        server.set_clipboard(test_content)
+        mock_copy.assert_called_with(test_content)
 
     def test_error_propagation(self):
         """Test how errors propagate through the system."""
-        with patch("client.requests.post") as mock_post:
-            # Test network error
-            mock_post.side_effect = ConnectionError("Network unreachable")
+        import client
 
-            # Should not raise exception
-            client.send_clipboard_to_server("test content")
-            mock_post.assert_called_once()
+        # Test WebSocket error - should not raise exception but add to pending queue
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+        mock_ws.send.side_effect = Exception("WebSocket connection lost")
+
+        client.ws_connection = mock_ws
+        client.pending_clipboard_updates = []  # Reset pending updates
+
+        # Should not raise exception, should add to pending queue
+        result = client.send_clipboard_to_server("test content")
+        assert result is False
+        assert len(client.pending_clipboard_updates) == 1
+        assert client.pending_clipboard_updates[0] == "test content"
 
         with patch("server.pyperclip.copy") as mock_copy:
             # Test clipboard error

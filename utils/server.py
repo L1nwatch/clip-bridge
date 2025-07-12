@@ -125,7 +125,21 @@ def websocket_app(environ, start_response):
                         logger.info(
                             f"Processing message from {client_addr}: {message[:50]}..."
                         )
-                        set_clipboard(message)
+
+                        # Handle different message types
+                        if message.startswith("clipboard_update:"):
+                            # Extract clipboard content from the message
+                            clipboard_content = message[len("clipboard_update:") :]
+                            logger.info(
+                                f"📋 Received clipboard update via WebSocket: {clipboard_content[:50]}..."
+                            )
+                            set_clipboard(clipboard_content)
+                        else:
+                            # Legacy format - treat entire message as clipboard content
+                            logger.info(
+                                f"📋 Received legacy clipboard message: {message[:50]}..."
+                            )
+                            set_clipboard(message)
 
                 except WebSocketError as e:
                     logger.error(f"WebSocket error: {e}")

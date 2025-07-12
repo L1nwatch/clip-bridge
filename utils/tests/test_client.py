@@ -8,7 +8,7 @@ import pytest
 import unittest.mock as mock
 import sys
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 
 # Add parent directory to path to import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -97,46 +97,131 @@ class TestClipboardClient:
         # Should not raise any exceptions
         client.on_error(mock_ws, "Test error")
 
-    @mock.patch("client.requests.post")
-    def test_send_clipboard_to_server_success(self, mock_post):
-        """Test successful clipboard sending."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_post.return_value = mock_response
+    @mock.patch("client.threading.Thread")
+    def test_on_open_with_pending_updates(self, mock_thread):
+        """Test WebSocket on_open with pending clipboard updates."""
+        import client
+
+        # Mock WebSocket
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+
+        # Set up pending updates
+        client.pending_clipboard_updates = ["pending content 1", "pending content 2"]
+
+        # Mock thread instances
+        mock_thread_instance = MagicMock()
+        mock_thread.return_value = mock_thread_instance
+
+        # Call on_open
+        client.on_open(mock_ws)
+
+        # Verify connection was set
+        assert client.ws_connection == mock_ws
+
+        # Verify pending updates were processed (sent via WebSocket)
+        expected_calls = [
+            call("clipboard_update:pending content 1"),
+            call("clipboard_update:pending content 2"),
+        ]
+        mock_ws.send.assert_has_calls(expected_calls)
+
+        # Verify pending updates were cleared
+        assert len(client.pending_clipboard_updates) == 0
+
+    def test_send_clipboard_to_server_websocket_success(self):
+        """Test successful clipboard sending via WebSocket."""
+        import client
+
+        # Mock WebSocket connection
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+
+        # Set the global WebSocket connection
+        client.ws_connection = mock_ws
 
         test_content = "test clipboard content"
-        client.send_clipboard_to_server(test_content)
+        result = client.send_clipboard_to_server(test_content)
 
-        mock_post.assert_called_once_with(
-            client.UPDATE_URL, data=test_content, timeout=5
-        )
+        # Verify WebSocket send was called with correct format
+        expected_message = f"clipboard_update:{test_content}"
+        mock_ws.send.assert_called_once_with(expected_message)
+        assert result is True
 
-    @mock.patch("client.requests.post")
-    def test_send_clipboard_to_server_failure(self, mock_post):
-        """Test clipboard sending with server error."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_post.return_value = mock_response
+    def test_send_clipboard_to_server_no_connection(self):
+        """Test clipboard sending when no WebSocket connection exists."""
+        import client
 
-        test_content = "test clipboard content"
-        client.send_clipboard_to_server(test_content)
-
-        mock_post.assert_called_once_with(
-            client.UPDATE_URL, data=test_content, timeout=5
-        )
-
-    @mock.patch("client.requests.post")
-    def test_send_clipboard_to_server_exception(self, mock_post):
-        """Test clipboard sending with network exception."""
-        mock_post.side_effect = Exception("Network error")
+        # Clear any existing connection
+        client.ws_connection = None
+        client.pending_clipboard_updates = []  # Reset pending updates
 
         test_content = "test clipboard content"
-        # Should not raise exception
-        client.send_clipboard_to_server(test_content)
+        result = client.send_clipboard_to_server(test_content)
 
-        mock_post.assert_called_once_with(
-            client.UPDATE_URL, data=test_content, timeout=5
-        )
+        # Should add to pending queue
+        assert result is False
+        assert len(client.pending_clipboard_updates) == 1
+        assert client.pending_clipboard_updates[0] == test_content
+
+    def test_send_clipboard_to_server_disconnected_websocket(self):
+        """Test clipboard sending when WebSocket is disconnected."""
+        import client
+
+        # Mock disconnected WebSocket
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = False
+        client.ws_connection = mock_ws
+        client.pending_clipboard_updates = []  # Reset pending updates
+
+        test_content = "test clipboard content"
+        result = client.send_clipboard_to_server(test_content)
+
+        # Should add to pending queue
+        assert result is False
+        assert len(client.pending_clipboard_updates) == 1
+        assert client.pending_clipboard_updates[0] == test_content
+
+    def test_send_clipboard_to_server_websocket_exception(self):
+        """Test clipboard sending with WebSocket exception."""
+        import client
+
+        # Mock WebSocket that raises exception on send
+        mock_ws = MagicMock()
+        mock_ws.sock = MagicMock()
+        mock_ws.sock.connected = True
+        mock_ws.send.side_effect = Exception("WebSocket error")
+
+        client.ws_connection = mock_ws
+        client.pending_clipboard_updates = []  # Reset pending updates
+
+        test_content = "test clipboard content"
+        result = client.send_clipboard_to_server(test_content)
+
+        # Should handle exception and add to pending queue
+        assert result is False
+        assert len(client.pending_clipboard_updates) == 1
+        assert client.pending_clipboard_updates[0] == test_content
+
+    def test_pending_clipboard_updates_limit(self):
+        """Test that pending clipboard updates are limited to 10 items."""
+        import client
+
+        client.ws_connection = None
+        client.pending_clipboard_updates = []  # Reset pending updates
+
+        # Add 15 items to exceed the limit
+        for i in range(15):
+            client.send_clipboard_to_server(f"test content {i}")
+
+        # Should only keep the latest 10
+        assert len(client.pending_clipboard_updates) == 10
+        # Should contain items 5-14 (latest 10)
+        assert client.pending_clipboard_updates[0] == "test content 5"
+        assert client.pending_clipboard_updates[-1] == "test content 14"
 
     def test_module_constants(self):
         """Test that module constants are properly defined."""
