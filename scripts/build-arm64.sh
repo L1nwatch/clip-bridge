@@ -7,7 +7,22 @@ echo "🚀 Starting ClipBridge ARM64 Mac build..."
 
 # Step 1: Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist/electron build
+# Safety check: Make sure we're in the project directory
+if [ ! -f "package.json" ]; then
+  echo "❌ ERROR: package.json not found. Make sure you're running this script from the project root directory."
+  exit 1
+fi
+
+# Safe cleanup with verification
+if [ -d "dist/electron" ]; then
+  echo "   Removing dist/electron directory..."
+  rm -rf dist/electron
+fi
+
+if [ -d "build" ]; then
+  echo "   Removing build directory..."
+  rm -rf build
+fi
 
 # Step 2: Ensure icons are present
 echo "🎨 Checking application icons..."
@@ -116,7 +131,13 @@ img.save('assets/icon.png')
             sips -z $double_size $double_size assets/icon.png --out assets/iconset.iconset/icon_${size}x${size}@2x.png >/dev/null 2>&1
         fi
     done
-    iconutil -c icns assets/iconset.iconset --output assets/icon.icns >/dev/null 2>&1 && rm -rf assets/iconset.iconset
+    
+    # Create ICNS file and cleanup safely
+    iconutil -c icns assets/iconset.iconset --output assets/icon.icns >/dev/null 2>&1
+    if [ -f "assets/icon.icns" ] && [ -d "assets/iconset.iconset" ]; then
+        echo "   Removing temporary iconset directory..."
+        rm -rf assets/iconset.iconset
+    fi
     
     python3 -c "
 from PIL import Image
@@ -131,21 +152,47 @@ else
     echo "   ✅ Icons already exist"
 fi
 
-# Step 3: Build Python executable
-echo "🐍 Building Python server executable..."
-cd utils && pyinstaller server.spec && cd ..
+# Step 3: Build standalone Python executables only
+echo "🐍 Building standalone Python executables..."
+./scripts/build-standalone-python.sh
 
 # Step 4: Build React app and Electron DMG (ARM64 only)
 echo "⚛️  Building React app and Electron DMG..."
-npm run build:clean && npx electron-builder --mac --arm64
+npm run build:clean && npx electron-builder --mac --arm64 --config electron-builder.json
 
 # Step 5: Clean up artifacts - keep only final .dmg file
 echo "🧽 Cleaning build artifacts..."
-cd dist/electron
-find . -type f ! -name '*.dmg' ! -name '*.exe' -delete
-rm -rf mac* win* linux* *.yml *.yaml
-find . -type d -empty -delete
-cd ../..
+# Safety check: Make sure we're in the correct directory
+if [ -d "dist/electron" ]; then
+  cd dist/electron
+  
+  # Check if we have any .dmg files before deleting other files
+  if ls *.dmg 1> /dev/null 2>&1; then
+    echo "   Found .dmg files, cleaning up other artifacts..."
+    # Delete files that aren't .exe or .dmg files
+    find . -type f ! -name '*.dmg' ! -name '*.exe' -delete
+    
+    # Safe removal of specific directories
+    for dir in mac win linux; do
+      if [ -d "$dir" ]; then
+        echo "   Removing $dir directory..."
+        rm -rf "$dir"
+      fi
+    done
+    
+    # Remove YAML files separately
+    rm -f *.yml *.yaml
+    
+    # Clean up empty directories
+    find . -type d -empty -delete
+  else
+    echo "❌ WARNING: No .dmg files found in dist/electron. Skipping cleanup to prevent data loss."
+  fi
+  
+  cd ../..
+else
+  echo "❌ WARNING: dist/electron directory not found. Skipping cleanup."
+fi
 
 # Step 6: Show results
 echo "✅ Build complete!"
@@ -155,4 +202,4 @@ echo "📊 File size:"
 du -h dist/electron/ClipBridge-0.1.0-arm64.dmg
 echo ""
 echo "🎉 Ready for distribution: dist/electron/ClipBridge-0.1.0-arm64.dmg"
-echo "💡 Size breakdown: ~112MB (250MB Electron runtime + 8MB Python server + 400KB React app)"
+echo "💡 Size breakdown: ~112MB (includes Electron runtime + standalone Python executables + React app)"

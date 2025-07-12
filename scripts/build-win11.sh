@@ -1,77 +1,119 @@
 #!/bin/bash
 
-# Build script for W# Create the Python distribution for Windows (source files instead of executable)
-echo "📁 Copying Python source files for bundling..."
-mkdir -p dist/python
-cp utils/server.py utils/client.py utils/requirements.txt dist/python/ 11 executable
-# This script builds both the Python server and the Electron app for Windows
+# ClipBridge Windows 11 Build Script (Standalone Version)
+# This script builds the Windows 11 executable with embedded standalone Python executables
 
-set -e
+echo "🚀 Starting ClipBridge Windows 11 build..."
 
-echo "🏗️  Building ClipBridge for Windows 11..."
-
-# Check if we have the necessary tools
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm is not installed. Please install Node.js first."
-    exit 1
-fi
-
-if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
-    echo "❌ Python is not installed. Please install Python first."
-    exit 1
-fi
-
-# Clean previous builds
+# Step 1: Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist/electron build
-
-# Step 1: Build Python server executable for Windows
-echo "🐍 Building Python server for Windows..."
-if [ ! -d "utils/.venv" ]; then
-    echo "📦 Creating Python virtual environment..."
-    cd utils && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && pip install pyinstaller && cd ..
-else
-    echo "📦 Using existing Python virtual environment..."
+# Safety check: Make sure we're in the project directory
+if [ ! -f "package.json" ]; then
+  echo "❌ ERROR: package.json not found. Make sure you're running this script from the project root directory."
+  exit 1
 fi
 
-# Create the Python distribution for Windows (source files instead of executable)
-echo "� Copying Python source files for bundling..."
-mkdir -p dist/python
-cp utils/server.py dist/python/
-cp utils/client.py dist/python/
-cp utils/requirements.txt dist/python/
+# Safe cleanup with verification
+if [ -d "dist/electron" ]; then
+  echo "   Removing dist/electron directory..."
+  rm -rf dist/electron
+fi
 
-echo "✅ Python source files prepared for bundling"
+if [ -d "build" ]; then
+  echo "   Removing build directory..."
+  rm -rf build
+fi
 
-# Step 2: Install npm dependencies
+# Step 2: Build standalone Python executables
+echo "🐍 Building standalone Python executables..."
+./scripts/build-standalone-python.sh
+
+# Verify the standalone executables were created
+echo "✅ Verifying standalone executables..."
+if [ ! -f "dist/python-standalone/clipbridge-server" ] && [ ! -f "dist/python-standalone/clipbridge-server.exe" ]; then
+  echo "❌ ERROR: Standalone server executable was not created!"
+  exit 1
+fi
+if [ ! -f "dist/python-standalone/clipbridge-client" ] && [ ! -f "dist/python-standalone/clipbridge-client.exe" ]; then
+  echo "❌ ERROR: Standalone client executable was not created!"
+  exit 1
+fi
+echo "✅ Standalone executables verified successfully"
+
+# Step 3: Install npm dependencies
 echo "📦 Installing npm dependencies..."
 npm install
 
-# Step 3: Build React app
-echo "⚛️  Building React application..."
-npm run build
+# Step 4: Build React application
+echo "⚛️ Building React application..."
+npm run build:clean
 
-# Step 4: Build Electron app for Windows
-echo "🖥️  Building Electron app for Windows 11..."
-npx electron-builder --win --x64
+# Step 5: Build Electron app for Windows 11
+echo "🖥️ Building Electron app for Windows 11..."
+# Use a separate config file instead of package.json
+npx electron-builder --win --x64 --config electron-builder.json
 
-# Step 5: Clean artifacts - keep only final .exe file
+# Optional: Check the contents of the packaged app before cleanup
+echo "📦 Checking package contents before cleanup..."
+if [ -d "dist/electron/win-unpacked/resources" ]; then
+  echo "Contents of resources directory:"
+  ls -la dist/electron/win-unpacked/resources/
+  
+  echo "Contents of python-standalone directory (if it exists):"
+  if [ -d "dist/electron/win-unpacked/resources/python-standalone" ]; then
+    ls -la dist/electron/win-unpacked/resources/python-standalone/
+    
+    # Check file permissions
+    echo "File permissions for python-standalone executables:"
+    ls -la dist/electron/win-unpacked/resources/python-standalone/clipbridge-server*
+    ls -la dist/electron/win-unpacked/resources/python-standalone/clipbridge-client*
+  else
+    echo "❌ WARNING: python-standalone directory not found in packaged app!"
+  fi
+else
+  echo "❌ WARNING: resources directory not found in packaged app!"
+fi
+
+# Step 6: Clean up artifacts - keep only final .exe file
 echo "🧽 Cleaning build artifacts..."
-cd dist/electron
-find . -type f ! -name '*.dmg' ! -name '*.exe' -delete
-rm -rf mac* win* linux* *.yml *.yaml
-find . -type d -empty -delete
-cd ../..
+# Safety check: Make sure we're in the correct directory
+if [ -d "dist/electron" ]; then
+  cd dist/electron
+  
+  # Check if we have any .exe files before deleting other files
+  if ls *.exe 1> /dev/null 2>&1; then
+    echo "   Found .exe files, cleaning up other artifacts..."
+    # Delete files that aren't .exe or .dmg files
+    find . -type f ! -name '*.dmg' ! -name '*.exe' -delete
+    
+    # Safe removal of specific directories
+    for dir in mac win linux; do
+      if [ -d "$dir" ]; then
+        echo "   Removing $dir directory..."
+        rm -rf "$dir"
+      fi
+    done
+    
+    # Remove YAML files separately
+    rm -f *.yml *.yaml
+    
+    # Clean up empty directories
+    find . -type d -empty -delete
+  else
+    echo "❌ WARNING: No .exe files found in dist/electron. Skipping cleanup to prevent data loss."
+  fi
+  
+  cd ../..
+else
+  echo "❌ WARNING: dist/electron directory not found. Skipping cleanup."
+fi
 
+# Step 7: Show results
 echo "✅ Build completed!"
 echo "📁 Output files:"
-echo "   - Windows x64 Installer: dist/electron/ClipBridge Setup *.exe"
-echo "   - Python Source Files: dist/python/"
+ls -la dist/electron/
 
-echo ""
 echo "🚀 To run on Windows 11:"
 echo "   1. Copy the installer to a Windows 11 machine"
 echo "   2. Run the .exe installer"
-echo "   3. Make sure Python 3.8+ is installed with required packages:"
-echo "      pip install flask flask-cors pyperclip gevent gevent-websocket loguru requests websocket-client"
-echo "   4. The app will be installed and ready to use"
+echo "   3. The app will be installed and ready to use (no Python dependencies required)"
