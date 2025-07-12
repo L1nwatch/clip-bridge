@@ -4,7 +4,7 @@
   "description": "A cross-platform clipboard synchronization tool",
   "author": "ClipBridge Team",
   "homepage": "./",
-  "main": "build/electron.js",
+  "main": "src/main.js",
   "scripts": {
     "react-start": "cross-env BROWSER=none react-scripts start",
     "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",
@@ -13,14 +13,16 @@
     "start:3001": "cross-env PORT=3001 concurrently \"cross-env BROWSER=none PORT=3001 react-scripts start\" \"wait-on http://localhost:3001 && cross-env NODE_ENV=development electron .\"",
     "start:3002": "cross-env PORT=3002 concurrently \"cross-env BROWSER=none PORT=3002 react-scripts start\" \"wait-on http://localhost:3002 && cross-env NODE_ENV=development electron .\"",
     "start:3003": "cross-env PORT=3003 concurrently \"cross-env BROWSER=none PORT=3003 react-scripts start\" \"wait-on http://localhost:3003 && cross-env NODE_ENV=development electron .\"",
-    "build": "GENERATE_SOURCEMAP=false react-scripts build && cp src/main.js build/electron.js && cp src/preload.js build/",
-    "electron:build": "npm run build && electron-builder",
-    "electron:dist": "npm run build && electron-builder --publish=never",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:win11": "npm run build && electron-builder --win --x64",
-    "dist:win11:full": "./scripts/build-win11.sh",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:mac:arm64": "npm run build && electron-builder --mac --arm64",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build && cp src/main.js build/electron.js && cp src/preload.js build/ && node -e \"const pkg=require('./package.json'); pkg.main='electron.js'; require('fs').writeFileSync('build/package.json', JSON.stringify(pkg, null, 2))\"",
+    "build:clean": "rm -rf build/ dist/electron/ && npm run build",
+    "electron:build": "npm run build:clean && electron-builder",
+    "electron:dist": "npm run build:clean && electron-builder --publish=never",
+    "dist:win": "npm run build:clean && electron-builder --win --x64 && npm run clean:artifacts",
+    "dist:win11": "npm run build:clean && electron-builder --win --x64 && npm run clean:artifacts",
+    "dist:mac": "npm run build:clean && electron-builder --mac --arm64 && npm run clean:artifacts",
+    "dist:official": "npm run build:clean && electron-builder --mac --win --publish=never && npm run clean:artifacts && npm run clean:temp",
+    "clean:temp": "rm -rf build/ clipbridge-server.spec && rm -rf build/",
+    "clean:artifacts": "cd dist/electron && find . -type f ! -name '*.dmg' ! -name '*.exe' -delete && rm -rf mac* win* linux* *.yml *.yaml && find . -type d -empty -delete",
     "dist:clean": "./scripts/build-arm64.sh",
     "dist:all": "npm run build && electron-builder --mac --win",
     "package": "electron-builder",
@@ -71,8 +73,8 @@
     },
     "files": [
       "build/**/*",
-      "src/main.js",
-      "src/preload.js",
+      "!build/static/js/*.map",
+      "!build/static/css/*.map",
       "!node_modules/**/*",
       "!src/**/*",
       "!utils/**/*",
@@ -94,7 +96,12 @@
           "arch": ["arm64"]
         }
       ],
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "icon": "assets/icon.icns",
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
     "win": {
       "target": [

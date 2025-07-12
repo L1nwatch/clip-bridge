@@ -120,7 +120,13 @@ class TestClipboardBridgeIntegration:
             # Any response (even 404) means server is running
             logger.success(f"✅ Server is responding (Status: {response.status_code})")
             assert response.status_code == 200
-            assert "Clipboard Bridge Server is running" in response.text
+
+            # Check for new JSON response format
+            response_data = response.json()
+            assert response_data["service"] == "ClipBridge Server"
+            assert response_data["status"] == "ok"
+            assert "version" in response_data
+
         except requests.exceptions.ConnectionError:
             pytest.fail("❌ Server is not responding")
         except Exception as e:

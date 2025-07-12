@@ -219,7 +219,13 @@ def get_clipboard(log_retrieval=True):
 @app.route("/")
 def health_check():
     """Health check endpoint."""
-    return "Clipboard Bridge Server is running", 200
+    return {"status": "ok", "service": "ClipBridge Server", "version": "1.0"}, 200
+
+
+@app.route("/health")
+def health_endpoint():
+    """Dedicated health check endpoint."""
+    return {"status": "healthy", "service": "ClipBridge Server", "version": "1.0"}, 200
 
 
 @app.route("/get_clipboard", methods=["GET"])
@@ -240,21 +246,41 @@ def update_clipboard():
     Update the server clipboard and notify clients.
     """
     global windows_clip
-    logger.info("Received POST request to update clipboard")
 
-    # Get the content from the request
-    content = request.get_data(as_text=True)
-    if content:
-        # Update Mac clipboard with content from Windows
-        set_clipboard(content)
-        windows_clip = content
-        logger.info(f"Updated Mac clipboard with: {content[:50]}...")
+    # Log request details for debugging
+    logger.info("=" * 50)
+    logger.info("📥 Received POST request to update clipboard")
+    logger.info(f"🔗 Request URL: {request.url}")
+    logger.info(f"📄 Request headers: {dict(request.headers)}")
+    logger.info(f"🌐 Client IP: {request.remote_addr}")
+    logger.info(f"📊 Content length: {request.content_length}")
 
-        # Notify other clients (if any)
-        notify_clients()
+    try:
+        # Get the content from the request
+        content = request.get_data(as_text=True)
+        logger.info(f"📝 Received content length: {len(content) if content else 0}")
 
-    logger.info("Clipboard update completed successfully")
-    return "OK", 200
+        if content:
+            # Update Mac clipboard with content from Windows
+            set_clipboard(content)
+            windows_clip = content
+            logger.info(f"✅ Updated Mac clipboard with: {content[:50]}...")
+
+            # Notify other clients (if any)
+            notify_clients()
+
+            logger.info("🎉 Clipboard update completed successfully")
+            return "OK", 200
+        else:
+            logger.warning("⚠️ No content received in request")
+            return "No content", 400
+
+    except Exception as e:
+        logger.error(f"❌ Error processing clipboard update: {e}")
+        logger.error(f"🔍 Error type: {type(e).__name__}")
+        return f"Server error: {str(e)}", 500
+    finally:
+        logger.info("=" * 50)
 
 
 if __name__ == "__main__":

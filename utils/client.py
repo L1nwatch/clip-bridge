@@ -147,19 +147,75 @@ def on_error(ws, error):
     logger.error(f"⚠️ WebSocket error: {error}")
 
 
+def test_server_connectivity():
+    """Test if the server is reachable."""
+    try:
+        logger.info("🔍 Testing server connectivity...")
+        logger.info(f"🔗 Testing URL: {UPDATE_URL}")
+
+        # Try a simple GET request first
+        response = requests.get(
+            f"http://{SERVER_HOST}:{SERVER_PORT}/",
+            timeout=5,
+            proxies={"http": None, "https": None},
+        )
+        logger.info(f"✅ Server reachable (Status: {response.status_code})")
+        return True
+
+    except requests.exceptions.ConnectionError:
+        logger.error("❌ Cannot connect to server")
+        logger.info(
+            f"💡 Make sure the server is running on {SERVER_HOST}:{SERVER_PORT}"
+        )
+        return False
+    except Exception as e:
+        logger.error(f"❌ Connectivity test failed: {e}")
+        return False
+
+
 def send_clipboard_to_server(content):
     """Send Windows clipboard content to Mac server."""
     try:
         logger.info(f"📤 Sending clipboard to Mac server: {content[:50]}...")
-        response = requests.post(UPDATE_URL, data=content, timeout=5)
+        logger.info(f"🔗 Target URL: {UPDATE_URL}")
+
+        headers = {
+            "Content-Type": "text/plain; charset=utf-8",
+            "User-Agent": "ClipBridge-Client/1.0",
+        }
+
+        response = requests.post(
+            UPDATE_URL,
+            data=content.encode("utf-8"),
+            headers=headers,
+            timeout=10,
+            proxies={"http": None, "https": None},  # Disable proxy
+        )
+
+        logger.info(f"📡 Response status: {response.status_code}")
+        logger.info(f"📄 Response headers: {dict(response.headers)}")
+
         if response.status_code == 200:
             logger.success("✅ Clipboard sent to Mac successfully!")
         else:
             logger.error(
                 f"❌ Failed to send clipboard to Mac (Status: {response.status_code})"
             )
+            logger.error(f"📄 Response content: {response.text}")
+
+    except requests.exceptions.ProxyError as e:
+        logger.error(f"❌ Proxy error sending clipboard to Mac: {e}")
+        logger.info("💡 Try disabling proxy settings or check network configuration")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"❌ Connection error sending clipboard to Mac: {e}")
+        logger.info(
+            f"💡 Make sure the server is running on {SERVER_HOST}:{SERVER_PORT}"
+        )
+    except requests.exceptions.Timeout as e:
+        logger.error(f"❌ Timeout error sending clipboard to Mac: {e}")
     except Exception as e:
         logger.error(f"❌ Error sending clipboard to Mac: {e}")
+        logger.info(f"💡 Error type: {type(e).__name__}")
 
 
 if __name__ == "__main__":
@@ -170,6 +226,15 @@ if __name__ == "__main__":
     logger.info(f"Update URL: {UPDATE_URL}")
     logger.info(f"Get Clipboard URL: {GET_CLIPBOARD_URL}")
     logger.info("=" * 50)
+
+    # Test server connectivity first
+    if not test_server_connectivity():
+        logger.error("🚫 Cannot proceed - server is not reachable")
+        logger.info("💡 Please make sure:")
+        logger.info("   1. The server is running on the Mac")
+        logger.info("   2. The port 8000 is not blocked by firewall")
+        logger.info("   3. Both devices are on the same network")
+        exit(1)
 
     try:
         # Enable debug for websocket (set to True for debugging)

@@ -59,6 +59,48 @@ python demo_clients.py 2 8001  # 2 clients on port 8001
 
 This will simulate multiple clients connecting to your server, allowing you to see the Connected Clients UI in action.
 
+### Troubleshooting
+
+#### "Cannot find module 'build/electron.js'" Error
+If you encounter this error when starting the app:
+```bash
+# First, build the project to create the build directory
+npm run build
+
+# Then start the application
+npm start
+```
+
+The build process creates the necessary `build/electron.js` file that Electron needs for production builds.
+
+#### "Failed to send clipboard to Mac (Status: 407)" Error
+This error indicates a proxy authentication issue. Try these solutions:
+
+1. **Disable proxy for local connections:**
+   ```bash
+   # On Windows, temporarily disable proxy
+   # Go to Settings > Network & Internet > Proxy > Turn off "Use a proxy server"
+   ```
+
+2. **Check network connectivity:**
+   ```bash
+   # Test if the Mac server is reachable
+   curl http://[MAC_IP]:8000/
+   
+   # Or use telnet to test the port
+   telnet [MAC_IP] 8000
+   ```
+
+3. **Firewall issues:**
+   - Make sure port 8000 is open on both devices
+   - Check if Windows Firewall or Mac Firewall is blocking the connection
+   - Try running on a different port: `PORT=8001 python server.py`
+
+4. **Network configuration:**
+   - Ensure both devices are on the same network
+   - Check if VPN is interfering with local connections
+   - Try using the Mac's IP address instead of 'localhost'
+
 ## 🧪 Testing
 
 ### Current Test Status
@@ -105,9 +147,25 @@ npm run lint
 ## 📦 Building and Packaging
 
 ```bash
-npm run build      # Build React app
-npm run package    # Package Electron app
+# Clean build React app
+npm run build:clean   # Clean previous builds and rebuild
+
+# Build distribution packages (outputs only .dmg and .exe files)
+npm run dist:mac      # Build ARM64 DMG for macOS (Apple Silicon)
+npm run dist:win11    # Build x64 EXE for Windows
+npm run dist:official # Build both platforms with cleanup
+
+# Manual cleanup commands
+npm run clean:temp      # Remove temporary build files
+npm run clean:artifacts # Keep only .dmg and .exe files in dist/electron/
 ```
+
+### Distribution Output
+After building, you'll find only these files in `dist/electron/`:
+- **`ClipBridge-0.1.0-arm64.dmg`** - macOS installer for Apple Silicon
+- **`ClipBridge Setup 0.1.0.exe`** - Windows installer for x64
+
+All other build artifacts (directories, config files, block maps) are automatically removed.
 
 ## 🔄 Quality Assurance
 
@@ -141,6 +199,8 @@ This project maintains high code quality through:
 - ✅ Added comprehensive integration testing
 - ✅ Resolved all flake8 code quality issues
 - ✅ Achieved 100% test success rate across all platforms
+- ✅ Streamlined build process with automatic cleanup
+- ✅ Optimized for Apple Silicon (ARM64) and Windows x64
 
 ## 🛠️ Tech Stack
 
