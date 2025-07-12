@@ -38,7 +38,7 @@ jobs:
         
     - name: List built executables
       run: |
-        ls -la dist/python-standalone/
+        Get-ChildItem -Path "dist/python-standalone/" -Force
         
     - name: Test executables
       run: |
