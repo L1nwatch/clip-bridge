@@ -45,7 +45,7 @@ fi
 echo "🔨 Creating Windows Python executable..."
 cd utils
 source .venv/bin/activate
-pyinstaller --distpath ../dist/python server-win.spec
+pyinstaller --onefile --distpath ../dist/python server.py --name clipbridge-server
 cd ..
 
 # Step 2: Install npm dependencies
