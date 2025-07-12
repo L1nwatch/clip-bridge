@@ -45,13 +45,14 @@ class TestClipboardClient:
         with patch("client.requests.get") as mock_get:
             mock_response = MagicMock()
             mock_response.text = "test clipboard content"
+            mock_response.status_code = 200
             mock_get.return_value = mock_response
 
             # Test the on_message function
             client.on_message(mock_ws, "new_clipboard")
 
             # Verify that a request was made to fetch clipboard
-            mock_get.assert_called_once_with(client.UPDATE_URL)
+            mock_get.assert_called_once_with(client.GET_CLIPBOARD_URL, timeout=5)
 
     def test_on_message_with_exception(self):
         """Test WebSocket message callback with network exception."""
@@ -63,7 +64,7 @@ class TestClipboardClient:
             # Should not raise exception
             client.on_message(mock_ws, "new_clipboard")
 
-            mock_get.assert_called_once_with(client.UPDATE_URL)
+            mock_get.assert_called_once_with(client.GET_CLIPBOARD_URL, timeout=5)
 
     def test_on_open_callback(self):
         """Test WebSocket connection open callback."""
@@ -77,9 +78,10 @@ class TestClipboardClient:
 
             client.on_open(mock_ws)
 
-            # Verify thread was created and started
-            mock_thread.assert_called_once()
-            mock_thread_instance.start.assert_called_once()
+            # Verify that two threads were created (monitoring + keepalive)
+            assert mock_thread.call_count == 2
+            # Verify start was called on both threads
+            assert mock_thread_instance.start.call_count == 2
 
     def test_on_close_callback(self):
         """Test WebSocket connection close callback."""
@@ -105,7 +107,9 @@ class TestClipboardClient:
         test_content = "test clipboard content"
         client.send_clipboard_to_server(test_content)
 
-        mock_post.assert_called_once_with(client.UPDATE_URL, data=test_content)
+        mock_post.assert_called_once_with(
+            client.UPDATE_URL, data=test_content, timeout=5
+        )
 
     @mock.patch("client.requests.post")
     def test_send_clipboard_to_server_failure(self, mock_post):
@@ -117,7 +121,9 @@ class TestClipboardClient:
         test_content = "test clipboard content"
         client.send_clipboard_to_server(test_content)
 
-        mock_post.assert_called_once_with(client.UPDATE_URL, data=test_content)
+        mock_post.assert_called_once_with(
+            client.UPDATE_URL, data=test_content, timeout=5
+        )
 
     @mock.patch("client.requests.post")
     def test_send_clipboard_to_server_exception(self, mock_post):
@@ -128,7 +134,9 @@ class TestClipboardClient:
         # Should not raise exception
         client.send_clipboard_to_server(test_content)
 
-        mock_post.assert_called_once_with(client.UPDATE_URL, data=test_content)
+        mock_post.assert_called_once_with(
+            client.UPDATE_URL, data=test_content, timeout=5
+        )
 
     def test_module_constants(self):
         """Test that module constants are properly defined."""

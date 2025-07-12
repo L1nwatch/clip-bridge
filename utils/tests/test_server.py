@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Unit tests for the clipboard server module.
+Unit tests for the clipboard server.
+
 Tests individual components and functions of the server.
 """
 
@@ -47,52 +48,48 @@ class TestClipboardServer:
             # Should return some response (even if 404)
             assert response.status_code in [200, 404]
 
-    @mock.patch("server.get_mac_clipboard")
-    def test_update_clipboard_endpoint(self, mock_get_clipboard):
+    @mock.patch("server.set_clipboard")
+    def test_update_clipboard_endpoint(self, mock_set_clipboard):
         """Test the clipboard update endpoint."""
-        mock_get_clipboard.return_value = "test clipboard content"
+        test_data = "test clipboard content"
 
         with server.app.test_client() as client:
-            response = client.post("/update_clipboard")
+            response = client.post("/update_clipboard", data=test_data)
 
             assert response.status_code == 200
             assert response.get_data(as_text=True) == "OK"
-            mock_get_clipboard.assert_called_once()
+            mock_set_clipboard.assert_called_once_with(test_data)
 
     @mock.patch("server.notify_clients")
-    @mock.patch("server.get_mac_clipboard")
-    def test_update_clipboard_notifies_clients(self, mock_get_clipboard, mock_notify):
+    @mock.patch("server.set_clipboard")
+    def test_update_clipboard_notifies_clients(self, mock_set_clipboard, mock_notify):
         """Test that updating clipboard notifies WebSocket clients."""
-        mock_get_clipboard.return_value = "test notification content"
+        test_data = "test notification content"
 
         with server.app.test_client() as client:
-            response = client.post("/update_clipboard")
+            response = client.post("/update_clipboard", data=test_data)
 
             assert response.status_code == 200
-            mock_get_clipboard.assert_called_once()
+            mock_set_clipboard.assert_called_once_with(test_data)
             mock_notify.assert_called_once()
 
-    @mock.patch("subprocess.Popen")
-    def test_set_mac_clipboard(self, mock_popen):
-        """Test setting clipboard content on macOS."""
-        mock_process = MagicMock()
-        mock_popen.return_value = mock_process
-
+    @mock.patch("server.pyperclip.copy")
+    def test_set_clipboard(self, mock_copy):
+        """Test setting clipboard content."""
         test_content = "test clipboard content"
-        server.set_mac_clipboard(test_content)
+        server.set_clipboard(test_content)
 
-        # Verify subprocess was called with correct parameters
-        mock_popen.assert_called_once_with(["pbcopy"], stdin=subprocess.PIPE)
-        mock_process.communicate.assert_called_once_with(test_content.encode())
+        # Verify pyperclip.copy was called with correct content
+        mock_copy.assert_called_once_with(test_content)
 
-    @mock.patch("subprocess.Popen")
-    def test_set_mac_clipboard_error_handling(self, mock_popen):
-        """Test error handling in set_mac_clipboard."""
-        mock_popen.side_effect = Exception("Process failed")
+    @mock.patch("server.pyperclip.copy")
+    def test_set_clipboard_error_handling(self, mock_copy):
+        """Test error handling in set_clipboard."""
+        mock_copy.side_effect = Exception("Clipboard access failed")
 
         test_content = "test content"
         # Should not raise exception
-        server.set_mac_clipboard(test_content)
+        server.set_clipboard(test_content)
 
     def test_notify_clients_empty_list(self):
         """Test notifying clients when no clients are connected."""
@@ -182,7 +179,7 @@ class TestWebSocketApp:
         # Just check that it doesn't raise an exception
         result = server.websocket_app(environ, start_response)
 
-    @mock.patch("server.get_mac_clipboard")
+    @mock.patch("server.get_clipboard")
     def test_websocket_app_with_mock_websocket(self, mock_get_clipboard):
         """Test WebSocket app with a mock WebSocket connection."""
         mock_get_clipboard.return_value = "test content"
