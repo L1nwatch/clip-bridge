@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   AppBar, 
   Toolbar, 
@@ -50,6 +50,25 @@ export default function App() {
   const [status, setStatus] = useState('idle'); // 'idle', 'starting', 'running', 'stopping', 'error'
   const [logs, setLogs] = useState([]);
   const [connectedDevices, setConnectedDevices] = useState([]);
+  
+  // Ref for auto-scrolling logs
+  const logContainerRef = useRef(null);
+
+  // Auto-scroll to latest log
+  useEffect(() => {
+    if (logContainerRef.current && logs.length > 0) {
+      // Use smooth scrolling for better UX, fallback for test environments
+      if (typeof logContainerRef.current.scrollTo === 'function') {
+        logContainerRef.current.scrollTo({
+          top: logContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        // Fallback for test environments (JSDOM)
+        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+      }
+    }
+  }, [logs]);
 
   // Mock devices for demonstration
   const mockDevices = [
@@ -322,15 +341,32 @@ export default function App() {
                     <ClearIcon />
                   </IconButton>
                 </Box>
-                <Box sx={{ 
-                  maxHeight: 200, 
-                  overflow: 'auto', 
-                  bgcolor: 'grey.50', 
-                  p: 2, 
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'grey.200'
-                }}>
+                <Box 
+                  ref={logContainerRef}
+                  sx={{ 
+                    maxHeight: 200, 
+                    overflow: 'auto', 
+                    bgcolor: 'grey.50', 
+                    p: 2, 
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: 'grey.200',
+                    scrollBehavior: 'smooth',
+                    '&::-webkit-scrollbar': {
+                      width: '6px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      bgcolor: 'grey.100',
+                      borderRadius: 3,
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      bgcolor: 'grey.300',
+                      borderRadius: 3,
+                      '&:hover': {
+                        bgcolor: 'grey.400',
+                      },
+                    },
+                  }}>
                   {logs.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
@@ -351,6 +387,17 @@ export default function App() {
                             borderRadius: 1, 
                             border: '1px solid',
                             borderColor: 'grey.100',
+                            animation: idx === logs.length - 1 ? 'fadeInUp 0.3s ease-out' : 'none',
+                            '@keyframes fadeInUp': {
+                              '0%': {
+                                opacity: 0,
+                                transform: 'translateY(10px)',
+                              },
+                              '100%': {
+                                opacity: 1,
+                                transform: 'translateY(0)',
+                              },
+                            },
                             '&:hover': {
                               bgcolor: 'grey.25'
                             }
