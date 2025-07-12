@@ -149,6 +149,12 @@ All pull requests must pass the CI pipeline including:
 - Code formatting compliance
 - Coverage requirements met
 
-## 📄 License
+## � Documentation
+
+- **[Testing Guide](docs/TESTING.md)** - Comprehensive test suite documentation
+- **[GitHub Actions](docs/GITHUB_ACTIONS.md)** - CI/CD workflow documentation  
+- **[Packaging Guide](docs/PACKAGING.md)** - Application distribution and packaging
+
+## �📄 License
 
 [Add your license here]
