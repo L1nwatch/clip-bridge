@@ -3,13 +3,12 @@
   "productName": "ClipBridge",
   "directories": {
     "output": "dist/electron",
-    "buildResources": "assets",
-    "app": "build"
+    "buildResources": "assets"
   },
   "files": [
-    "build/**/*",
-    "!build/static/js/*.map",
-    "!build/static/css/*.map",
+    "**/*",
+    "!static/js/*.map",
+    "!static/css/*.map",
     "!node_modules/**/*",
     "!src/**/*",
     "!utils/**/*",

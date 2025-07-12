@@ -4,7 +4,7 @@
   "description": "A cross-platform clipboard synchronization tool",
   "author": "ClipBridge Team",
   "homepage": "./",
-  "main": "src/main.js",
+  "main": "build/electron.js",
   "scripts": {
     "react-start": "cross-env BROWSER=none react-scripts start",
     "electron-start": "wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .",

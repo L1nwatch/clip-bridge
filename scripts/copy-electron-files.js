@@ -42,10 +42,20 @@ function updatePackageJson() {
     /** @type {any} */
     // @ts-ignore - JSON module import
     const pkg = require('../package.json');
-    pkg.main = 'electron.js';
+    
+    // Create a minimal package.json for the built app
+    const buildPkg = {
+      name: pkg.name,
+      version: pkg.version,
+      description: pkg.description,
+      author: pkg.author,
+      homepage: pkg.homepage,
+      main: 'electron.js',
+      dependencies: pkg.dependencies
+    };
     
     const buildPackagePath = path.join(__dirname, '../build/package.json');
-    fs.writeFileSync(buildPackagePath, JSON.stringify(pkg, null, 2));
+    fs.writeFileSync(buildPackagePath, JSON.stringify(buildPkg, null, 2));
     console.log(`✅ Updated build/package.json`);
   } catch (error) {
     console.error(`❌ Failed to update package.json:`, error.message);
