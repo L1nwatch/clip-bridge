@@ -2,8 +2,10 @@
  * Tests for the main process client connection parsing functionality
  */
 
-// Mock console methods
+// Mock console methods with proper console interface
+// @ts-ignore - Test console mock
 global.console = {
+  ...console,
   log: jest.fn(),
   error: jest.fn(),
 };

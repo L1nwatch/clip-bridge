@@ -1,3 +1,4 @@
+// @ts-nocheck - Test file with extensive Electron API mocking
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';

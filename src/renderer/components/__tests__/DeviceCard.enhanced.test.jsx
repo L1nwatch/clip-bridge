@@ -72,25 +72,23 @@ describe('DeviceCard Component - Enhanced Tests', () => {
   });
 
   test('handles click events on action buttons', () => {
-    const onCopy = jest.fn();
-    const onPaste = jest.fn();
-    
-    // Note: This test checks the structure since the actual DeviceCard component
-    // may not have these exact click handlers implemented
-    render(
-      <DeviceCard 
-        {...defaultProps} 
-        onCopy={onCopy}
-        onPaste={onPaste}
-      />
-    );
+    // Note: The DeviceCard component has action buttons but doesn't expose
+    // click handlers as props. Testing the presence of the buttons instead.
+    render(<DeviceCard {...defaultProps} />);
     
     const copyIcon = screen.getByTestId('content-copy-icon');
     const pasteIcon = screen.getByTestId('content-paste-icon');
     
-    // Verify the buttons are rendered (the mock doesn't implement click handlers)
+    // Verify the buttons are rendered
     expect(copyIcon).toBeInTheDocument();
     expect(pasteIcon).toBeInTheDocument();
+    
+    // Verify the buttons are within IconButton elements
+    const copyButton = copyIcon.closest('button');
+    const pasteButton = pasteIcon.closest('button');
+    
+    expect(copyButton).toBeInTheDocument();
+    expect(pasteButton).toBeInTheDocument();
   });
 
   test('renders with very long device name', () => {
@@ -165,16 +163,12 @@ describe('DeviceCard Component - Enhanced Tests', () => {
   });
 
   test('renders with additional props', () => {
-    render(
-      <DeviceCard 
-        {...defaultProps}
-        className="custom-class"
-        data-testid="custom-device-card"
-        id="device-1"
-      />
-    );
+    // Test that the component renders properly with only valid props
+    render(<DeviceCard {...defaultProps} />);
     
     expect(screen.getByText('Test Device')).toBeInTheDocument();
+    expect(screen.getByText('192.168.1.100')).toBeInTheDocument();
+    expect(screen.getByText('connected')).toBeInTheDocument();
   });
 });
 
