@@ -70,10 +70,17 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+    
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
     
     - name: Install Node.js dependencies
-      run: npm ci
+      run: npm install
     
     - name: Run React tests
       run: npm run test:coverage
@@ -112,7 +119,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+    
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
     
     - name: Install Python linting dependencies
       run: |
@@ -120,7 +134,7 @@ jobs:
         pip install black flake8
     
     - name: Install Node.js dependencies
-      run: npm ci
+      run: npm install
     
     - name: Check Python code formatting with Black
       run: |
@@ -145,10 +159,17 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+    
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
     
     - name: Install Node.js dependencies
-      run: npm ci
+      run: npm install
     
     - name: Build Electron app
       run: npm run build
@@ -179,7 +200,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+    
+    - name: Cache Node.js dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
     
     - name: Install Python dependencies
       run: |
@@ -187,7 +215,7 @@ jobs:
         pip install -r utils/requirements.txt
     
     - name: Install Node.js dependencies
-      run: npm ci
+      run: npm install
     
     - name: Run Python integration tests
       run: |
