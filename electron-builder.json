@@ -3,7 +3,8 @@
   "productName": "ClipBridge",
   "directories": {
     "output": "dist/electron",
-    "buildResources": "assets"
+    "buildResources": "assets",
+    "app": "build"
   },
   "files": [
     "build/**/*",
@@ -15,7 +16,6 @@
     "!coverage/**/*",
     "!dist/**/*"
   ],
-  "main": "build/electron.js",
   "extraResources": [
     {
       "from": "dist/python-standalone/",
