@@ -108,9 +108,11 @@ class TestClientEdgeCases:
         """Test WebSocket event handlers with various scenarios."""
         mock_ws = MagicMock()
 
-        # Test on_open with missing websocket methods
-        mock_ws.sock = None
-        client.on_open(mock_ws)  # Should not crash
+        # Mock pyperclip to prevent CI clipboard issues
+        with patch("client.pyperclip.paste", return_value="test clipboard"):
+            # Test on_open with missing websocket methods
+            mock_ws.sock = None
+            client.on_open(mock_ws)  # Should not crash
 
         # Test on_close
         client.on_close(mock_ws, 1000, "Normal closure")

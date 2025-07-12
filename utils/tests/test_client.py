@@ -63,7 +63,9 @@ class TestClipboardClient:
         mock_ws.sock = MagicMock()
         mock_ws.sock.connected = True
 
-        with patch("threading.Thread") as mock_thread:
+        with patch("threading.Thread") as mock_thread, patch(
+            "client.pyperclip.paste", return_value="test clipboard"
+        ):
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
 
@@ -88,8 +90,9 @@ class TestClipboardClient:
         # Should not raise any exceptions
         client.on_error(mock_ws, "Test error")
 
+    @mock.patch("client.pyperclip.paste", return_value="test clipboard")
     @mock.patch("client.threading.Thread")
-    def test_on_open_with_pending_updates(self, mock_thread):
+    def test_on_open_with_pending_updates(self, mock_thread, mock_paste):
         """Test WebSocket on_open with pending clipboard updates."""
         import client
 

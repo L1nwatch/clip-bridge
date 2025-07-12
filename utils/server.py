@@ -92,6 +92,63 @@ def monitor_mac_clipboard():
             time.sleep(5)  # Wait longer on error
 
 
+def _handle_websocket_message(ws, message, client_addr):
+    """Handle individual WebSocket messages."""
+    if message == "ping":
+        ws.send("pong")
+        logger.debug("Sent pong response")
+    elif message == "get_clipboard":
+        # Client is requesting current clipboard content
+        current_clipboard = get_clipboard()
+        response = f"clipboard_content:{current_clipboard}"
+        ws.send(response)
+        logger.info(f"📋 Sent clipboard content to client: {current_clipboard[:50]}...")
+    elif message.startswith("clipboard_update:"):
+        # Extract clipboard content from the message
+        clipboard_content = message[len("clipboard_update:") :]
+        logger.info(
+            f"📋 Received clipboard update via WebSocket: {clipboard_content[:50]}..."
+        )
+        set_clipboard(clipboard_content)
+    else:
+        # Legacy format - treat entire message as clipboard content
+        if not message.startswith(("pong", "ping")):
+            logger.info(f"📋 Received legacy clipboard message: {message[:50]}...")
+            set_clipboard(message)
+
+
+def _process_websocket_messages(ws, client_addr):
+    """Process messages in the WebSocket message loop."""
+    while not ws.closed:
+        try:
+            logger.debug("Waiting for message...")
+            message = ws.receive()
+            logger.debug(f"Received message: {message}")
+
+            if message is None:
+                # No message received, but connection is still alive
+                logger.debug("No message received, continuing...")
+                time.sleep(0.1)  # Small delay to prevent busy waiting
+                continue
+
+            if message:  # Only process non-empty messages
+                logger.info(f"Processing message from {client_addr}: {message[:50]}...")
+                _handle_websocket_message(ws, message, client_addr)
+
+        except WebSocketError as e:
+            logger.error(f"WebSocket error: {e}")
+            break
+        except Exception as e:
+            # Handle specific WebSocket errors but don't break for timeout
+            logger.error(f"Exception in receive loop: {e}")
+            if "timed out" in str(e).lower():
+                logger.debug("Timeout in receive, continuing...")
+                continue
+            else:
+                logger.error(f"WebSocket receive error: {e}")
+                break
+
+
 def websocket_app(environ, start_response):
     """Handle WebSocket connections at WSGI level"""
     logger.info("WSGI WebSocket handler called")
@@ -109,76 +166,14 @@ def websocket_app(environ, start_response):
 
         try:
             logger.info("Starting WebSocket message loop")
-            # Keep connection alive and wait for messages
-            while not ws.closed:
-                try:
-                    logger.debug("Waiting for message...")
-                    # Use a timeout to prevent blocking indefinitely
-                    message = ws.receive()
-                    logger.debug(f"Received message: {message}")
-
-                    if message is None:
-                        # No message received, but connection is still alive
-                        logger.debug("No message received, continuing...")
-                        time.sleep(0.1)  # Small delay to prevent busy waiting
-                        continue
-
-                    if message:  # Only process non-empty messages
-                        logger.info(
-                            f"Processing message from {client_addr}: {message[:50]}..."
-                        )
-
-                        # Handle different message types
-                        if message == "ping":
-                            ws.send("pong")
-                            logger.debug("Sent pong response")
-                        elif message == "get_clipboard":
-                            # Client is requesting current clipboard content
-                            current_clipboard = get_clipboard()
-                            response = f"clipboard_content:{current_clipboard}"
-                            ws.send(response)
-                            logger.info(
-                                f"📋 Sent clipboard content to client: "
-                                f"{current_clipboard[:50]}..."
-                            )
-                        elif message.startswith("clipboard_update:"):
-                            # Extract clipboard content from the message
-                            clipboard_content = message[len("clipboard_update:") :]
-                            logger.info(
-                                f"📋 Received clipboard update via WebSocket: "
-                                f"{clipboard_content[:50]}..."
-                            )
-                            set_clipboard(clipboard_content)
-                        else:
-                            # Legacy format - treat entire message as clipboard content
-                            if not message.startswith(("pong", "ping")):
-                                logger.info(
-                                    f"📋 Received legacy clipboard message: "
-                                    f"{message[:50]}..."
-                                )
-                                set_clipboard(message)
-
-                except WebSocketError as e:
-                    logger.error(f"WebSocket error: {e}")
-                    break
-                except Exception as e:
-                    # Handle specific WebSocket errors but don't break for timeout
-                    logger.error(f"Exception in receive loop: {e}")
-                    if "timed out" in str(e).lower():
-                        logger.debug("Timeout in receive, continuing...")
-                        continue
-                    else:
-                        logger.error(f"WebSocket receive error: {e}")
-                        break
-
+            _process_websocket_messages(ws, client_addr)
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
         finally:
             with lock:
                 websocket_clients.discard(ws)
                 logger.info(
-                    f"Client {client_addr} disconnected. "
-                    f"Total clients: {len(websocket_clients)}"
+                    f"Client {client_addr} disconnected. Total clients: {len(websocket_clients)}"
                 )
 
         return []

@@ -208,6 +208,34 @@ if True:  # Simulate if __name__ == "__main__":
 
             mock_trace.assert_called_with(False)
 
+    def test_clipboard_unavailable_ci_environment(self):
+        """Test behavior when clipboard is unavailable (CI environment)."""
+        import client
+        from unittest.mock import patch, MagicMock
+
+        # Test monitor_windows_clipboard with clipboard unavailable
+        client.running = True
+        client.last_windows_clipboard = ""
+
+        clipboard_error = Exception(
+            "Pyperclip could not find a copy/paste mechanism for your system"
+        )
+
+        with patch("client.pyperclip.paste", side_effect=clipboard_error):
+            # Should exit gracefully without crashing
+            client.monitor_windows_clipboard()
+            # Function should return early due to clipboard unavailability
+
+        # Test on_message with clipboard unavailable
+        mock_ws = MagicMock()
+        original_last_clipboard = client.last_windows_clipboard
+
+        with patch("client.pyperclip.copy", side_effect=clipboard_error):
+            # Should handle clipboard_content message gracefully
+            client.on_message(mock_ws, "clipboard_content:test content")
+            # last_windows_clipboard should not be updated
+            assert client.last_windows_clipboard == original_last_clipboard
+
 
 class TestServerCoverage:
     """Additional tests to improve server.py coverage."""

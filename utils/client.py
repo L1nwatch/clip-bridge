@@ -48,9 +48,20 @@ def monitor_windows_clipboard():
     global last_windows_clipboard
     logger.info("🔍 Starting Windows clipboard monitor...")
 
-    # Initialize with current clipboard content
-    last_windows_clipboard = pyperclip.paste()
-    logger.info(f"📋 Initial Windows clipboard: {last_windows_clipboard[:50]}...")
+    try:
+        # Initialize with current clipboard content
+        last_windows_clipboard = pyperclip.paste()
+        logger.info(f"📋 Initial Windows clipboard: {last_windows_clipboard[:50]}...")
+    except Exception as e:
+        # Handle case where clipboard is not available (CI environments, etc.)
+        if "could not find a copy/paste mechanism" in str(e).lower():
+            logger.warning(
+                "🔕 Clipboard monitoring disabled - no system clipboard available (likely CI environment)"
+            )
+            return
+        else:
+            logger.error(f"❌ Failed to initialize clipboard monitoring: {e}")
+            return
 
     while running:
         try:
@@ -70,33 +81,59 @@ def monitor_windows_clipboard():
 
             time.sleep(1)  # Check every second
         except Exception as e:
-            logger.error(f"Error monitoring Windows clipboard: {e}")
-            time.sleep(5)  # Wait longer on error
+            # Handle clipboard access errors gracefully
+            if "could not find a copy/paste mechanism" in str(e).lower():
+                logger.warning(
+                    "🔕 Clipboard monitoring stopped - no system clipboard available"
+                )
+                break
+            else:
+                logger.error(f"Error monitoring Windows clipboard: {e}")
+                time.sleep(5)  # Wait longer on error
+
+
+def _handle_new_clipboard_request(ws):
+    """Handle new_clipboard message type."""
+    try:
+        ws.send("get_clipboard")
+        logger.debug("📤 Requested clipboard content via WebSocket")
+    except Exception as e:
+        logger.error(f"❌ Failed to request clipboard content: {e}")
+
+
+def _handle_clipboard_content(message):
+    """Handle clipboard_content message type."""
+    global last_windows_clipboard
+
+    try:
+        mac_content = message[18:]  # Remove "clipboard_content:" prefix
+        if not mac_content or mac_content == last_windows_clipboard:
+            return  # No update needed
+
+        # Update Windows clipboard
+        try:
+            pyperclip.copy(mac_content)
+            last_windows_clipboard = mac_content
+            logger.success(f"📋 Updated Windows clipboard: {mac_content[:50]}...")
+        except Exception as clipboard_error:
+            if "could not find a copy/paste mechanism" in str(clipboard_error).lower():
+                logger.warning(
+                    "🔕 Cannot update clipboard - no system clipboard available (likely CI environment)"
+                )
+            else:
+                raise clipboard_error
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Mac clipboard update: {e}")
 
 
 def on_message(ws, message):
     """Handle messages from Mac server."""
-    global last_windows_clipboard
     logger.info(f"📨 Received message: {message}")
 
     if message == "new_clipboard":
-        # Request clipboard content via WebSocket
-        try:
-            ws.send("get_clipboard")
-            logger.debug("📤 Requested clipboard content via WebSocket")
-        except Exception as e:
-            logger.error(f"❌ Failed to request clipboard content: {e}")
+        _handle_new_clipboard_request(ws)
     elif message.startswith("clipboard_content:"):
-        # Received clipboard content from Mac server
-        try:
-            mac_content = message[18:]  # Remove "clipboard_content:" prefix
-            if mac_content and mac_content != last_windows_clipboard:
-                # Update Windows clipboard
-                pyperclip.copy(mac_content)
-                last_windows_clipboard = mac_content
-                logger.success(f"📋 Updated Windows clipboard: {mac_content[:50]}...")
-        except Exception as e:
-            logger.error(f"❌ Failed to handle Mac clipboard update: {e}")
+        _handle_clipboard_content(message)
 
 
 def on_open(ws):
@@ -165,89 +202,74 @@ def test_server_connectivity():
         return False
 
 
+def _add_to_pending_queue(content):
+    """Helper function to add content to pending queue."""
+    global pending_clipboard_updates
+    pending_clipboard_updates.append(content)
+    if len(pending_clipboard_updates) > 10:
+        pending_clipboard_updates = pending_clipboard_updates[1:]  # Remove oldest
+    logger.info(f"📦 Pending clipboard updates: {len(pending_clipboard_updates)}")
+
+
+def _is_connection_valid():
+    """Check if WebSocket connection is valid and ready to use."""
+    if not ws_connection:
+        logger.debug("⚠️ No WebSocket connection available")
+        return False
+
+    if not hasattr(ws_connection, "sock") or not ws_connection.sock:
+        logger.debug("⚠️ WebSocket connection not established")
+        return False
+
+    # Try to check connection state more safely
+    try:
+        if (
+            hasattr(ws_connection.sock, "connected")
+            and not ws_connection.sock.connected
+        ):
+            logger.debug("⚠️ WebSocket connection lost (sock.connected = False)")
+            return False
+    except (AttributeError, TypeError):
+        # If we can't check the connection state, assume it's ok and
+        # let the send() call handle it
+        logger.debug("Connection state check failed, will attempt to send")
+
+    return True
+
+
+def _handle_send_error(e, content):
+    """Handle errors that occur during clipboard sending."""
+    error_msg = str(e)
+    if "mock" in error_msg.lower() or "test" in error_msg.lower():
+        # During testing, log at debug level to avoid confusing error messages
+        logger.debug(f"🧪 Test WebSocket error (expected): {e}")
+    else:
+        # Real connection errors should be logged as warnings, not errors
+        logger.warning(f"⚠️ WebSocket connection issue: {e}")
+
+    logger.info(f"💡 Error type: {type(e).__name__}")
+    logger.info("💡 Adding to pending queue for retry when connection is restored")
+    _add_to_pending_queue(content)
+
+
 def send_clipboard_to_server(content):
     """Send Windows clipboard content to Mac server via WebSocket."""
-    global pending_clipboard_updates
-
-    def add_to_pending_queue():
-        """Helper function to add content to pending queue."""
-        pending_clipboard_updates.append(content)
-        if len(pending_clipboard_updates) > 10:
-            pending_clipboard_updates.pop(0)  # Remove oldest
-        logger.info(
-            f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
-        )
-
     try:
-        # Safer connection checking - avoid accessing .sock.connected directly
-        # as it can be unreliable
-        connection_ok = True
-
-        if not ws_connection:
-            connection_ok = False
-            logger.debug("⚠️ No WebSocket connection available")
-        elif not hasattr(ws_connection, "sock") or not ws_connection.sock:
-            connection_ok = False
-            logger.debug("⚠️ WebSocket connection not established")
-        else:
-            # Try to check connection state more safely
-            try:
-                if (
-                    hasattr(ws_connection.sock, "connected")
-                    and not ws_connection.sock.connected
-                ):
-                    connection_ok = False
-                    logger.debug("⚠️ WebSocket connection lost (sock.connected = False)")
-            except (AttributeError, TypeError):
-                # If we can't check the connection state, assume it's ok and
-                # let the send() call handle it
-                logger.debug("Connection state check failed, will attempt to send")
-
-        if not connection_ok:
+        if not _is_connection_valid():
             logger.debug("💡 Adding clipboard update to pending queue...")
-            # Add to pending queue directly to satisfy flake8
-            pending_clipboard_updates.append(content)
-            if len(pending_clipboard_updates) > 10:
-                pending_clipboard_updates = pending_clipboard_updates[
-                    1:
-                ]  # Remove oldest
-            logger.info(
-                f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
-            )
+            _add_to_pending_queue(content)
             return False
 
         logger.info(f"📤 Sending clipboard via WebSocket: {content[:50]}...")
 
         # Create a message with clipboard content
-        # Using a simple format: "clipboard_update:<content>"
         message = f"clipboard_update:{content}"
-
         ws_connection.send(message)
         logger.success("✅ Clipboard sent to Mac successfully via WebSocket!")
         return True
 
     except Exception as e:
-        # Check if this is a test environment or expected connection issue
-        error_msg = str(e)
-        if "mock" in error_msg.lower() or "test" in error_msg.lower():
-            # During testing, log at debug level to avoid confusing error messages
-            logger.debug(f"🧪 Test WebSocket error (expected): {e}")
-        else:
-            # Real connection errors should be logged as warnings, not errors
-            logger.warning(f"⚠️ WebSocket connection issue: {e}")
-
-        logger.info(f"💡 Error type: {type(e).__name__}")
-        logger.info(
-            "💡 Adding to pending queue for retry when connection is " "restored"
-        )
-
-        # Add to pending updates directly to satisfy flake8
-        pending_clipboard_updates.append(content)
-        if len(pending_clipboard_updates) > 10:
-            pending_clipboard_updates = pending_clipboard_updates[1:]  # Remove oldest
-        logger.info(
-            f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
-        )
+        _handle_send_error(e, content)
         return False
 
 
