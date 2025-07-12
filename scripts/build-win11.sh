@@ -41,12 +41,14 @@ else
     cd ..
 fi
 
-# Create the Python executable for Windows
-echo "🔨 Creating Windows Python executable..."
-cd utils
-source .venv/bin/activate
-pyinstaller --onefile --distpath ../dist/python server.py --name clipbridge-server
-cd ..
+# Create the Python distribution for Windows (source files instead of executable)
+echo "� Copying Python source files for bundling..."
+mkdir -p dist/python
+cp utils/server.py dist/python/
+cp utils/client.py dist/python/
+cp utils/requirements.txt dist/python/
+
+echo "✅ Python source files prepared for bundling"
 
 # Step 2: Install npm dependencies
 echo "📦 Installing npm dependencies..."
@@ -62,12 +64,13 @@ npx electron-builder --win --x64
 
 echo "✅ Build completed!"
 echo "📁 Output files:"
-echo "   - Windows Installer: dist/electron/ClipBridge Setup *.exe"
-echo "   - Windows Portable: dist/electron/ClipBridge-*-win.zip"
-echo "   - Python Server: dist/python/server.exe"
+echo "   - Windows x64 Installer: dist/electron/ClipBridge Setup *.exe"
+echo "   - Python Source Files: dist/python/"
 
 echo ""
 echo "🚀 To run on Windows 11:"
 echo "   1. Copy the installer to a Windows 11 machine"
 echo "   2. Run the .exe installer"
+echo "   3. Make sure Python 3.8+ is installed with required packages:"
+echo "      pip install flask flask-cors pyperclip gevent gevent-websocket loguru requests websocket-client"
 echo "   3. The app will be installed and ready to use"

@@ -15,28 +15,10 @@ function getPythonExecutablePath() {
     // In development, use Python from virtual environment
     return process.platform === 'win32' ? 'python' : 'python3';
   } else {
-    // In production, use bundled executable
-    const resourcesPath = process.resourcesPath;
-    const pythonDir = path.join(resourcesPath, 'python');
-    const exeName = process.platform === 'win32' ? 'clipbridge-server.exe' : 'clipbridge-server';
-    const exePath = path.join(pythonDir, exeName);
-    
-    console.log('Using bundled Python executable:', exePath);
-    
-    if (fs.existsSync(exePath)) {
-      // Make sure the executable has the right permissions on Unix systems
-      if (process.platform !== 'win32') {
-        try {
-          fs.chmodSync(exePath, '755');
-        } catch (err) {
-          console.log('Could not set executable permissions:', err);
-        }
-      }
-      return exePath;
-    } else {
-      console.error('Bundled Python executable not found:', exePath);
-      throw new Error('Python server executable not found in packaged app');
-    }
+    // In production, always fallback to system Python if we're on a different platform
+    // This handles the case where we built on macOS but need to run on Windows
+    console.log('Using system Python for cross-platform compatibility');
+    return process.platform === 'win32' ? 'python' : 'python3';
   }
 }
 
@@ -45,8 +27,9 @@ function getPythonScriptPath() {
     // In development, use the actual Python files
     return path.join(__dirname, '..', 'utils', 'server.py');
   } else {
-    // In production, we use the executable directly, no script path needed
-    return null;
+    // In production, always use the bundled script (not executable)
+    const resourcesPath = process.resourcesPath;
+    return path.join(resourcesPath, 'python', 'server.py');
   }
 }
 
@@ -237,7 +220,6 @@ ipcMain.handle('start-server', async (event, config) => {
 
       let hasResolved = false;
       let allOutput = '';
-
       let logBuffer = '';
 
       serverProcess.stdout.on('data', (data) => {

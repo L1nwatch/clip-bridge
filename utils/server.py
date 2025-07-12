@@ -8,6 +8,7 @@ import os
 import json
 import time
 import sys
+import pyperclip
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
@@ -55,6 +56,38 @@ def after_request(response):
 windows_clip = ""
 websocket_clients = set()
 lock = threading.Lock()
+last_mac_clipboard = ""
+
+
+def monitor_mac_clipboard():
+    """Monitor Mac clipboard for changes and notify clients."""
+    global last_mac_clipboard
+    logger.info("🔍 Starting Mac clipboard monitor...")
+
+    # Initialize with current clipboard content
+    last_mac_clipboard = get_clipboard(log_retrieval=False)
+    logger.info(f"📋 Initial Mac clipboard: {last_mac_clipboard[:50]}...")
+
+    while True:
+        try:
+            # Silently check clipboard content
+            current_clipboard = get_clipboard(log_retrieval=False)
+
+            # Only process if clipboard actually changed and has content
+            if current_clipboard != last_mac_clipboard and current_clipboard.strip():
+                logger.info(
+                    f"📋 Mac clipboard changed from: {last_mac_clipboard[:30]}..."
+                )
+                logger.info(f"📋 Mac clipboard changed to: {current_clipboard[:50]}...")
+                last_mac_clipboard = current_clipboard
+
+                # Notify all connected Windows clients
+                notify_clients()
+
+            time.sleep(1)  # Check every second
+        except Exception as e:
+            logger.error(f"Error monitoring Mac clipboard: {e}")
+            time.sleep(5)  # Wait longer on error
 
 
 def websocket_app(environ, start_response):
@@ -92,7 +125,7 @@ def websocket_app(environ, start_response):
                         logger.info(
                             f"Processing message from {client_addr}: {message[:50]}..."
                         )
-                        set_mac_clipboard(message)
+                        set_clipboard(message)
 
                 except WebSocketError as e:
                     logger.error(f"WebSocket error: {e}")
@@ -158,27 +191,25 @@ def notify_clients():
             )
 
 
-def set_mac_clipboard(data):
+def set_clipboard(data):
     """
-    Set the Mac clipboard content.
+    Set the clipboard content (cross-platform).
     """
     try:
-        p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
-        p.communicate(data.encode())
+        pyperclip.copy(data)
         logger.info(f"Clipboard updated with: {data[:50]}...")
     except Exception as e:
         logger.error(f"Failed to set clipboard: {e}")
 
 
-def get_mac_clipboard():
+def get_clipboard(log_retrieval=True):
     """
-    Get the current Mac clipboard content.
+    Get the current clipboard content (cross-platform).
     """
     try:
-        p = subprocess.Popen(["pbpaste"], stdout=subprocess.PIPE)
-        data, _ = p.communicate()
-        content = data.decode()
-        logger.info(f"Retrieved clipboard content: {content[:50]}...")
+        content = pyperclip.paste()
+        if log_retrieval:
+            logger.info(f"Retrieved clipboard content: {content[:50]}...")
         return content
     except Exception as e:
         logger.error(f"Failed to get clipboard: {e}")
@@ -191,6 +222,19 @@ def health_check():
     return "Clipboard Bridge Server is running", 200
 
 
+@app.route("/get_clipboard", methods=["GET"])
+def get_clipboard_content():
+    """Get current clipboard content."""
+    global windows_clip
+    try:
+        content = get_clipboard(log_retrieval=True)  # Log when explicitly requested
+        logger.info(f"Sending clipboard content: {content[:50]}...")
+        return content, 200
+    except Exception as e:
+        logger.error(f"Failed to get clipboard: {e}")
+        return "Error getting clipboard", 500
+
+
 @app.route("/update_clipboard", methods=["POST"])
 def update_clipboard():
     """
@@ -199,8 +243,16 @@ def update_clipboard():
     global windows_clip
     logger.info("Received POST request to update clipboard")
 
-    windows_clip = get_mac_clipboard()
-    notify_clients()
+    # Get the content from the request
+    content = request.get_data(as_text=True)
+    if content:
+        # Update Mac clipboard with content from Windows
+        set_clipboard(content)
+        windows_clip = content
+        logger.info(f"Updated Mac clipboard with: {content[:50]}...")
+
+        # Notify other clients (if any)
+        notify_clients()
 
     logger.info("Clipboard update completed successfully")
     return "OK", 200
@@ -218,6 +270,10 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     try:
+        # Start Mac clipboard monitoring in background
+        monitor_thread = threading.Thread(target=monitor_mac_clipboard, daemon=True)
+        monitor_thread.start()
+
         # Run the server with WebSocket support using combined WSGI app
         server = pywsgi.WSGIServer(
             ("0.0.0.0", PORT), combined_app, handler_class=WebSocketHandler

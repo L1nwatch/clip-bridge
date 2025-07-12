@@ -83,7 +83,7 @@
       {
         "from": "dist/python/",
         "to": "python/",
-        "filter": ["clipbridge-server*"]
+        "filter": ["*.py", "*.txt", "*.md"]
       }
     ],
     "mac": {
@@ -100,11 +100,7 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
-        },
-        {
-          "target": "zip",
-          "arch": ["x64", "ia32"]
+          "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.ico",

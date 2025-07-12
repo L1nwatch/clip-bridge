@@ -1,6 +1,8 @@
 # Clipboard Bridge Dependencies
 # Core application dependencies
 Flask==3.1.1
+Flask-CORS==5.0.0
+pyperclip==1.9.0
 Flask-Sockets==0.2.1
 gevent==25.5.1
 gevent-websocket==0.10.1
