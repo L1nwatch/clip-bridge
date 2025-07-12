@@ -158,7 +158,7 @@ echo "🐍 Building standalone Python executables..."
 
 # Step 4: Build React app and Electron DMG (ARM64 only)
 echo "⚛️  Building React app and Electron DMG..."
-npm run build:clean && npx electron-builder --mac --arm64 --config electron-builder.json
+npm run build:clean && npx electron-builder --mac --arm64 --config config/electron-builder.json
 
 # Step 5: Clean up artifacts - keep only final .dmg file
 echo "🧽 Cleaning build artifacts..."

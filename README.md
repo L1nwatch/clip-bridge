@@ -279,9 +279,20 @@ This project maintains high code quality through:
 │   │   ├── test_integration.py # Integration tests
 │   │   └── test_edge_cases.py  # Edge case and error handling tests
 │   └── requirements.txt        # Python dependencies
+├── config/                      # Configuration files
+│   ├── electron-builder.json   # Electron packaging configuration
+│   ├── eslint.config.mjs       # ESLint rules and settings
+│   ├── jsconfig.json           # JavaScript/TypeScript project settings
+│   ├── jest.config.json        # Jest testing framework configuration
+│   └── pyproject.toml          # Python project configuration
+├── scripts/                     # Build and automation scripts
 ├── package.json                # Node.js dependencies and scripts
+├── jsconfig.json               # → config/jsconfig.json (symlink)
+├── eslint.config.mjs           # → config/eslint.config.mjs (symlink)
 └── README.md                   # This documentation
 ```
+
+> **Note**: Some config files (jsconfig.json, eslint.config.mjs) have symlinks in the root directory for tool compatibility, but the actual files are organized in the `config/` folder.
 
 ## 🤝 Contributing
 

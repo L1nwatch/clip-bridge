@@ -178,7 +178,7 @@ npm run build:clean
 # Step 5: Build Electron app for Windows 11
 echo "🖥️ Building Electron app for Windows 11..."
 # Use a separate config file instead of package.json
-npx electron-builder --win --x64 --config electron-builder.json
+npx electron-builder --win --x64 --config config/electron-builder.json
 
 # Optional: Check the contents of the packaged app before cleanup
 echo "📦 Checking package contents before cleanup..."

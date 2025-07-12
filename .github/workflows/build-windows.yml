@@ -115,7 +115,7 @@ jobs:
         }
       
     - name: Build Electron app for Windows
-      run: npx electron-builder --win --x64 --config electron-builder.json --publish=never
+      run: npx electron-builder --win --x64 --config config/electron-builder.json --publish=never
       
     - name: List final build outputs
       run: |
