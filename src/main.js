@@ -267,7 +267,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      enableRemoteModule: false,
       webSecurity: true,
     },
     show: false, // Don't show until ready
@@ -469,12 +468,13 @@ ipcMain.handle('start-server', async (event, config) => {
     
     // Only add PYTHONPATH in development
     if (isDev) {
-      env.PYTHONPATH = 'utils/.venv/lib/python3.9/site-packages';
+      env['PYTHONPATH'] = 'utils/.venv/lib/python3.9/site-packages';
     }
     
     const spawnOptions = {
       env: env,
       cwd: isDev ? path.join(__dirname, '../') : path.dirname(serverScriptPath),
+      // @ts-ignore - stdio type issue in VS Code
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: process.platform === 'win32' // Always use shell on Windows for better compatibility
     };
@@ -488,17 +488,19 @@ ipcMain.handle('start-server', async (event, config) => {
       // Using Python interpreter
       console.log('Using Python interpreter with args:', args);
       console.log('Python executable exists:', fs.existsSync(pythonPath));
+      // @ts-ignore - spawn options type issue
       serverProcess = spawn(pythonPath, args, spawnOptions);
     } else {
       // Using standalone executable directly
       console.log('Using standalone executable directly:', serverScriptPath);
       console.log('Standalone executable exists:', fs.existsSync(serverScriptPath));
+      // @ts-ignore - spawn options type issue
       serverProcess = spawn(serverScriptPath, [], spawnOptions);
     }
     
     // Check for ENOENT errors (file not found)
     serverProcess.on('error', error => {
-      if (error.code === 'ENOENT') {
+      if ('code' in error && error.code === 'ENOENT') {
         console.error('ENOENT Error: Executable not found!');
         console.error('- Python path:', pythonPath);
         console.error('- Script path:', serverScriptPath);
@@ -726,7 +728,7 @@ ipcMain.handle('start-client', async (event, config) => {
     
     // Only add PYTHONPATH in development
     if (isDev) {
-      env.PYTHONPATH = 'utils/.venv/lib/python3.9/site-packages';
+      env['PYTHONPATH'] = 'utils/.venv/lib/python3.9/site-packages';
     }
     
     const spawnOptions = {
@@ -792,12 +794,13 @@ ipcMain.handle('start-client', async (event, config) => {
         
         // Attempt to spawn the process
         console.log('Final spawn options:', JSON.stringify(spawnOptions, null, 2));
+        // @ts-ignore - spawn options type issue
         clientProcess = spawn(clientScriptPath, [], spawnOptions);
         
         // Add error handler for file not found or compatibility issues
         clientProcess.on('error', error => {
           console.error('Client process spawn error:', error);
-          if (error.code === 'ENOENT') {
+          if ('code' in error && error.code === 'ENOENT') {
             console.error('ENOENT Error: Client executable not found!');
             console.error('- Script path:', clientScriptPath);
             console.error('- CWD:', spawnOptions.cwd);
@@ -821,7 +824,7 @@ ipcMain.handle('start-client', async (event, config) => {
                 console.error('Fallback attempt failed:', fallbackError);
               }
             }
-          } else if (error.code === 'UNKNOWN' || error.code === 'EACCES') {
+          } else if ('code' in error && (error.code === 'UNKNOWN' || error.code === 'EACCES')) {
             console.error(`${error.code} Error: This often happens with permission issues or incorrect path.`);
             console.error('- Script path:', clientScriptPath);
             console.error('- File exists:', fs.existsSync(clientScriptPath));
@@ -844,6 +847,7 @@ ipcMain.handle('start-client', async (event, config) => {
       // Using Python interpreter
       console.log('Using Python interpreter');
       console.log('Python executable exists:', fs.existsSync(pythonPath));
+      // @ts-ignore - spawn options type issue
       clientProcess = spawn(pythonPath, [clientScriptPath], spawnOptions);
     }
 

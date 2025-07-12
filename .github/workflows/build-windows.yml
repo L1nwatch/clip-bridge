@@ -90,8 +90,32 @@ jobs:
     - name: Build React application
       run: npm run build:clean
       
+    - name: Debug build directory contents
+      run: |
+        Write-Host "Contents of build directory:"
+        if (Test-Path "build") {
+          Get-ChildItem -Path "build" -Recurse -Force | Select-Object FullName, Length
+        } else {
+          Write-Host "❌ build directory not found"
+        }
+        
+        Write-Host "Checking for main electron file:"
+        if (Test-Path "build/electron.js") {
+          Write-Host "✅ build/electron.js exists"
+        } else {
+          Write-Host "❌ build/electron.js not found"
+        }
+        
+        if (Test-Path "build/package.json") {
+          Write-Host "✅ build/package.json exists"
+          Write-Host "Contents of build/package.json:"
+          Get-Content "build/package.json"
+        } else {
+          Write-Host "❌ build/package.json not found"
+        }
+      
     - name: Build Electron app for Windows
-      run: npx electron-builder --win --x64 --config electron-builder.json
+      run: npx electron-builder --win --x64 --config electron-builder.json --publish=never
       
     - name: List final build outputs
       run: |

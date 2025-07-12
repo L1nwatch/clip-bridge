@@ -15,6 +15,7 @@
     "!coverage/**/*",
     "!dist/**/*"
   ],
+  "main": "build/electron.js",
   "extraResources": [
     {
       "from": "dist/python-standalone/",
@@ -80,5 +81,6 @@
     "displayLanguageSelector": true,
     "unicode": true,
     "differentialPackage": false
-  }
+  },
+  "publish": null
 }

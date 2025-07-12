@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * @fileoverview Cross-platform script to clean build directories
@@ -6,9 +7,16 @@
  * Works on Windows, macOS, and Linux.
  */
 
+/** @type {import('fs')} */
 const fs = require('fs');
+/** @type {import('path')} */
 const path = require('path');
 
+/**
+ * Removes a directory and all its contents
+ * @param {string} dirPath - Path to the directory to remove
+ * @returns {void}
+ */
 function removeDirectory(dirPath) {
   if (fs.existsSync(dirPath)) {
     try {

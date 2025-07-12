@@ -5,8 +5,6 @@
  * @env node
  */
 
-/* global require, console, __dirname, process, setTimeout */
-
 const { spawn } = require('child_process');
 const getPort = require('get-port');
 const path = require('path');
@@ -15,6 +13,7 @@ const fs = require('fs');
 async function startWithDynamicPort() {
   try {
     // Find an available port starting from 3000
+    // @ts-ignore - get-port module types
     const port = await getPort({ port: getPort.makeRange(3000, 3100) });
     
     console.log(`🚀 Starting React dev server on port ${port}`);

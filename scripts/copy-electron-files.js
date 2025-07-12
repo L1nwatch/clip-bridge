@@ -6,9 +6,17 @@
  * and updates package.json for Electron builds. Works on Windows, macOS, and Linux.
  */
 
+/** @type {import('fs')} */
 const fs = require('fs');
+/** @type {import('path')} */
 const path = require('path');
 
+/**
+ * Copies a file from source to destination
+ * @param {string} src - Source file path
+ * @param {string} dest - Destination file path
+ * @returns {void}
+ */
 function copyFile(src, dest) {
   try {
     // Ensure destination directory exists
@@ -25,8 +33,14 @@ function copyFile(src, dest) {
   }
 }
 
+/**
+ * Updates package.json in the build directory
+ * @returns {void}
+ */
 function updatePackageJson() {
   try {
+    /** @type {any} */
+    // @ts-ignore - JSON module import
     const pkg = require('../package.json');
     pkg.main = 'electron.js';
     
