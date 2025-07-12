@@ -18,41 +18,25 @@ function getPythonExecutablePath() {
     // In production, use bundled executable
     const resourcesPath = process.resourcesPath;
     const pythonDir = path.join(resourcesPath, 'python');
+    const exeName = process.platform === 'win32' ? 'clipbridge-server.exe' : 'clipbridge-server';
+    const exePath = path.join(pythonDir, exeName);
     
-    console.log('Looking for Python executable in:', pythonDir);
-    console.log('ResourcesPath:', resourcesPath);
+    console.log('Using bundled Python executable:', exePath);
     
-    if (process.platform === 'win32') {
-      const exePath = path.join(pythonDir, 'clipbridge-server.exe');
-      console.log('Checking Windows executable:', exePath);
-      if (fs.existsSync(exePath)) {
-        return exePath;
-      }
-    } else {
-      const exePath = path.join(pythonDir, 'clipbridge-server');
-      console.log('Checking macOS/Linux executable:', exePath);
-      if (fs.existsSync(exePath)) {
-        // Make sure the executable has the right permissions
+    if (fs.existsSync(exePath)) {
+      // Make sure the executable has the right permissions on Unix systems
+      if (process.platform !== 'win32') {
         try {
           fs.chmodSync(exePath, '755');
         } catch (err) {
           console.log('Could not set executable permissions:', err);
         }
-        return exePath;
       }
+      return exePath;
+    } else {
+      console.error('Bundled Python executable not found:', exePath);
+      throw new Error('Python server executable not found in packaged app');
     }
-    
-    // Check if Python files exist as fallback
-    const serverScript = path.join(pythonDir, 'server.py');
-    console.log('Checking fallback Python script:', serverScript);
-    if (fs.existsSync(serverScript)) {
-      // Fallback to system Python with script
-      return process.platform === 'win32' ? 'python' : 'python3';
-    }
-    
-    console.log('No Python executable or script found, using system Python');
-    // Final fallback to system Python
-    return process.platform === 'win32' ? 'python' : 'python3';
   }
 }
 
@@ -61,23 +45,8 @@ function getPythonScriptPath() {
     // In development, use the actual Python files
     return path.join(__dirname, '..', 'utils', 'server.py');
   } else {
-    // Check if we have a bundled executable
-    const resourcesPath = process.resourcesPath;
-    const pythonDir = path.join(resourcesPath, 'python');
-    const exeName = process.platform === 'win32' ? 'clipbridge-server.exe' : 'clipbridge-server';
-    const exePath = path.join(pythonDir, exeName);
-    
-    console.log('Checking for executable at:', exePath);
-    
-    if (fs.existsSync(exePath)) {
-      // Using executable, no script path needed
-      return null;
-    } else {
-      // Fallback to Python script
-      const scriptPath = path.join(pythonDir, 'server.py');
-      console.log('Using fallback script:', scriptPath);
-      return scriptPath;
-    }
+    // In production, we use the executable directly, no script path needed
+    return null;
   }
 }
 

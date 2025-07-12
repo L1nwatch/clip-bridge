@@ -73,12 +73,9 @@
       "build/**/*",
       "src/main.js",
       "src/preload.js",
-      "utils/server.py",
-      "utils/client.py",
-      "utils/requirements.txt",
       "!node_modules/**/*",
       "!src/**/*",
-      "!utils/.venv/**/*",
+      "!utils/**/*",
       "!coverage/**/*",
       "!dist/**/*"
     ],
@@ -86,7 +83,7 @@
       {
         "from": "dist/python/",
         "to": "python/",
-        "filter": ["clipbridge-server*", "*.py", "requirements.txt"]
+        "filter": ["clipbridge-server*"]
       }
     ],
     "mac": {
