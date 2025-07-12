@@ -1,5 +1,9 @@
 name: Build Cross-Platform Executables
 
+permissions:
+  contents: write
+  actions: read
+
 on:
   push:
     tags:
@@ -74,21 +78,38 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r utils/requirements.txt
         pip install pyinstaller
         
-    - name: Build macOS executables
+    - name: Build standalone Python executables
       run: |
         mkdir -p dist/python-standalone
         cd utils
         pyinstaller --onefile --distpath ../dist/python-standalone server.py --name clipbridge-server --clean
         pyinstaller --onefile --distpath ../dist/python-standalone client.py --name clipbridge-client --clean
         
-    - name: Verify executables
+    - name: Install Node.js dependencies
+      run: npm install
+      
+    - name: Build React application and Electron DMG
       run: |
+        # Build React app and copy Electron files
+        npm run build:clean
+        
+        # Build Electron DMG for macOS ARM64
+        npx electron-builder --mac --arm64 --config config/electron-builder.json
+        
+    - name: Verify all builds
+      run: |
+        echo "=== Python Executables ==="
         if [ -f "dist/python-standalone/clipbridge-server" ]; then
           size=$(stat -f%z "dist/python-standalone/clipbridge-server")
           echo "✅ clipbridge-server created (Size: $((size / 1024 / 1024)) MB)"
@@ -103,18 +124,32 @@ jobs:
           echo "❌ clipbridge-client not found"; exit 1
         fi
         
+        echo "=== Electron DMG ==="
+        if ls dist/electron/*.dmg 1> /dev/null 2>&1; then
+          for dmg in dist/electron/*.dmg; do
+            size=$(stat -f%z "$dmg")
+            echo "✅ $(basename "$dmg") created (Size: $((size / 1024 / 1024)) MB)"
+          done
+        else
+          echo "❌ No DMG files found"; exit 1
+        fi
+        
     - name: Upload macOS artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: macos-executables
+        name: macos-complete
         path: |
           dist/python-standalone/clipbridge-server
           dist/python-standalone/clipbridge-client
+          dist/electron/*.dmg
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
     
     steps:
     - name: Checkout code
@@ -129,8 +164,8 @@ jobs:
     - name: Download macOS artifacts
       uses: actions/download-artifact@v4
       with:
-        name: macos-executables
-        path: ./macos-executables
+        name: macos-complete
+        path: ./macos-complete
         
     - name: Create release packages
       run: |
@@ -139,13 +174,14 @@ jobs:
         zip -r ../clipbridge-windows-x64.zip .
         cd ..
         
-        # Create macOS package
-        cd macos-executables
-        tar -czf ../clipbridge-macos.tar.gz .
+        # Copy DMG file to root for release
+        cd macos-complete
+        cp *.dmg ../ 2>/dev/null || echo "No DMG files found"
         cd ..
         
         # List all files
-        ls -la
+        echo "=== Release files ==="
+        ls -la *.zip *.dmg 2>/dev/null || echo "Some files may be missing"
         
     - name: Generate release tag
       id: tag
@@ -156,16 +192,24 @@ jobs:
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
         
+    - name: Debug Token Permissions
+      run: |
+        echo "GitHub Actor: ${{ github.actor }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.tag.outputs.tag }}
         name: ClipBridge ${{ steps.tag.outputs.tag }}
         draft: false
         prerelease: false
+        generate_release_notes: true
         files: |
           clipbridge-windows-x64.zip
-          clipbridge-macos.tar.gz
+          *.dmg
         body: |
           # ClipBridge ${{ steps.tag.outputs.tag }}
           
@@ -175,16 +219,34 @@ jobs:
           - **clipbridge-windows-x64.zip** - Contains `clipbridge-server.exe` and `clipbridge-client.exe`
           - These are native Windows x64 executables that don't require Python to be installed
           
-          ### macOS
-          - **clipbridge-macos.tar.gz** - Contains `clipbridge-server` and `clipbridge-client`
-          - These are native macOS executables that don't require Python to be installed
+          ### macOS (Apple Silicon)
+          - **ClipBridge-0.1.0-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
+          - Native macOS application that doesn't require Python to be installed
+          - Includes both GUI interface and embedded server/client functionality
           
           ## Installation
           
-          1. Download the appropriate package for your platform
+          ### Windows
+          1. Download `clipbridge-windows-x64.zip`
           2. Extract the files to a directory of your choice
-          3. Run the executables directly - no additional dependencies required
+          3. Run the executables directly (`clipbridge-server.exe` or `clipbridge-client.exe`)
+          
+          ### macOS
+          1. Download the `.dmg` file
+          2. Open the DMG and drag ClipBridge to Applications folder
+          3. Launch ClipBridge from Applications - all functionality included
           
           Built on: $(date +'%Y-%m-%d %H:%M:%S UTC')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Fallback - Create Release with GitHub CLI
+      if: failure()
+      run: |
+        gh release create ${{ steps.tag.outputs.tag }} \
+          --title "ClipBridge ${{ steps.tag.outputs.tag }}" \
+          --notes "Cross-platform clipboard synchronization tool - Built on $(date +'%Y-%m-%d %H:%M:%S UTC')" \
+          clipbridge-windows-x64.zip \
+          *.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
