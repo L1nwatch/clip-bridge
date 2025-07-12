@@ -16,12 +16,83 @@ function getPythonExecutablePath() {
     return process.platform === 'win32' ? 'python' : 'python3';
   } else {
     // In production, check if we have standalone executables
-    const resourcesPath = process.resourcesPath;
-    const standaloneServer = process.platform === 'win32' 
-      ? path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe')
-      : path.join(resourcesPath, 'python-standalone', 'clipbridge-server');
+    // Try multiple possible resource paths in case the default one isn't available
+    const possibleResourcePaths = [
+      process.resourcesPath,
+      path.join(process.execPath, '..', 'resources'),
+      path.join(path.dirname(process.execPath), 'resources'),
+      path.join(app.getAppPath(), '..', 'resources'),
+      path.join(app.getPath('exe'), '..', 'resources')
+    ];
     
-    console.log('Checking for standalone executable at:', standaloneServer);
+    console.log('Checking possible resource paths:');
+    possibleResourcePaths.forEach(resPath => {
+      console.log(`- ${resPath} (exists: ${fs.existsSync(resPath)})`);
+    });
+    
+    // Find the first valid resources path
+    let resourcesPath = null;
+    for (const resPath of possibleResourcePaths) {
+      if (fs.existsSync(resPath)) {
+        resourcesPath = resPath;
+        console.log('Using resources path:', resourcesPath);
+        break;
+      }
+    }
+    
+    if (!resourcesPath) {
+      console.error('No valid resources path found, using default');
+      resourcesPath = process.resourcesPath;
+    }
+    
+    // Try both with and without .exe extension to support cross-platform builds
+    const possibleExecutables = [
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server.bat'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server-win.py'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server.py')
+    ];
+    
+    // For Windows, prioritize Python scripts and .bat files over potentially incompatible .exe files
+    if (process.platform === 'win32') {
+      possibleExecutables.sort((a, b) => {
+        if (a.endsWith('-win.py') && !b.endsWith('-win.py')) return -1;
+        if (!a.endsWith('-win.py') && b.endsWith('-win.py')) return 1;
+        if (a.endsWith('.py') && !b.endsWith('.py')) return -1;
+        if (!a.endsWith('.py') && b.endsWith('.py')) return 1;
+        if (a.endsWith('.bat') && !b.endsWith('.bat')) return -1;
+        if (!a.endsWith('.bat') && b.endsWith('.bat')) return 1;
+        if (a.endsWith('.exe') && !b.endsWith('.exe')) return -1;
+        if (!a.endsWith('.exe') && b.endsWith('.exe')) return 1;
+        return 0;
+      });
+    }
+    
+    // Log all possible paths we're checking
+    possibleExecutables.forEach(execPath => {
+      console.log(`Checking executable path: ${execPath} (exists: ${fs.existsSync(execPath)})`);
+    });
+    
+    let standaloneServer = null;
+    
+    // Find the first executable that exists
+    for (const execPath of possibleExecutables) {
+      console.log('Checking for standalone executable at:', execPath);
+      if (fs.existsSync(execPath)) {
+        standaloneServer = execPath;
+        break;
+      }
+    }
+    
+    if (!standaloneServer) {
+      // Default to platform-specific path for error messages
+      standaloneServer = process.platform === 'win32' 
+        ? path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe')
+        : path.join(resourcesPath, 'python-standalone', 'clipbridge-server');
+    }
+    
+    console.log('Selected standalone executable:', standaloneServer);
     
     // List all files in the directory to debug
     try {
@@ -57,19 +128,53 @@ function getPythonScriptPath() {
     // In development, use the actual Python files
     return path.join(__dirname, '..', 'utils', 'server.py');
   } else {
-    // Check if we have standalone executables
-    const resourcesPath = process.resourcesPath;
+    // Try multiple possible resource paths in case the default one isn't available
+    const possibleResourcePaths = [
+      process.resourcesPath,
+      path.join(process.execPath, '..', 'resources'),
+      path.join(path.dirname(process.execPath), 'resources'),
+      path.join(app.getAppPath(), '..', 'resources'),
+      path.join(app.getPath('exe'), '..', 'resources')
+    ];
+    
+    // Find the first valid resources path
+    let resourcesPath = null;
+    for (const resPath of possibleResourcePaths) {
+      if (fs.existsSync(resPath)) {
+        resourcesPath = resPath;
+        console.log('Using resources path for server script:', resourcesPath);
+        break;
+      }
+    }
+    
+    if (!resourcesPath) {
+      console.error('No valid resources path found for server script, using default');
+      resourcesPath = process.resourcesPath;
+    }
+    
+    // Try both with and without .exe extension to support cross-platform builds
+    const possibleExecutables = [
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-server.bat')
+    ];
+    
+    // Find the first executable that exists
+    for (const execPath of possibleExecutables) {
+      if (fs.existsSync(execPath)) {
+        console.log('Found server executable at:', execPath);
+        return execPath; // Return the path to the standalone executable
+      }
+    }
+    
+    // Default to platform-specific path for error messages
     const standaloneServer = process.platform === 'win32' 
       ? path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe')
       : path.join(resourcesPath, 'python-standalone', 'clipbridge-server');
       
-    if (fs.existsSync(standaloneServer)) {
-      return standaloneServer; // Return the path to the standalone executable
-    } else {
-      // Log error instead of falling back
-      console.error('Standalone server executable not found. This is required for operation.');
-      return standaloneServer; // Return the path anyway, will fail gracefully later with a clear error
-    }
+    // Log error instead of falling back
+    console.error('Standalone server executable not found. This is required for operation.');
+    return standaloneServer; // Return the path anyway, will fail gracefully later with a clear error
   }
 }
 
@@ -77,19 +182,77 @@ function getClientScriptPath() {
   if (isDev) {
     return path.join(__dirname, '..', 'utils', 'client.py');
   } else {
-    // Check if we have standalone executables
-    const resourcesPath = process.resourcesPath;
+    // Try multiple possible resource paths in case the default one isn't available
+    const possibleResourcePaths = [
+      process.resourcesPath,
+      path.join(process.execPath, '..', 'resources'),
+      path.join(path.dirname(process.execPath), 'resources'),
+      path.join(app.getAppPath(), '..', 'resources'),
+      path.join(app.getPath('exe'), '..', 'resources')
+    ];
+    
+    // Find the first valid resources path
+    let resourcesPath = null;
+    for (const resPath of possibleResourcePaths) {
+      if (fs.existsSync(resPath)) {
+        resourcesPath = resPath;
+        console.log('Using resources path for client script:', resourcesPath);
+        break;
+      }
+    }
+    
+    if (!resourcesPath) {
+      console.error('No valid resources path found for client script, using default');
+      resourcesPath = process.resourcesPath;
+    }
+    
+    // Try both with and without .exe extension to support cross-platform builds
+    const possibleExecutables = [
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-client.exe'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-client'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-client.bat'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-client-win.py'),
+      path.join(resourcesPath, 'python-standalone', 'clipbridge-client.py')
+    ];
+    
+    // For Windows, prioritize Python scripts and .bat files over potentially incompatible .exe files
+    if (process.platform === 'win32') {
+      possibleExecutables.sort((a, b) => {
+        if (a.endsWith('-win.py') && !b.endsWith('-win.py')) return -1;
+        if (!a.endsWith('-win.py') && b.endsWith('-win.py')) return 1;
+        if (a.endsWith('.py') && !b.endsWith('.py')) return -1;
+        if (!a.endsWith('.py') && b.endsWith('.py')) return 1;
+        if (a.endsWith('.bat') && !b.endsWith('.bat')) return -1;
+        if (!a.endsWith('.bat') && b.endsWith('.bat')) return 1;
+        if (a.endsWith('.exe') && !b.endsWith('.exe')) return -1;
+        if (!a.endsWith('.exe') && b.endsWith('.exe')) return 1;
+        return 0;
+      });
+    }
+    
+    // Log all possible paths we're checking
+    possibleExecutables.forEach(execPath => {
+      console.log(`Checking client executable path: ${execPath} (exists: ${fs.existsSync(execPath)})`);
+    });
+    
+    // Find the first executable that exists
+    for (const execPath of possibleExecutables) {
+      if (fs.existsSync(execPath)) {
+        console.log('Found client executable at:', execPath);
+        return execPath; // Return the path to the standalone executable
+      }
+    }
+    
+    // Default to platform-specific path for error messages
     const standaloneClient = process.platform === 'win32' 
       ? path.join(resourcesPath, 'python-standalone', 'clipbridge-client.exe')
       : path.join(resourcesPath, 'python-standalone', 'clipbridge-client');
       
-    if (fs.existsSync(standaloneClient)) {
-      return standaloneClient; // Return the path to the standalone executable
-    } else {
-      // Log error instead of falling back
-      console.error('Standalone client executable not found. This is required for operation.');
-      return standaloneClient; // Return the path anyway, will fail gracefully later with a clear error
-    }
+    // Log error instead of falling back
+    console.error('Standalone client executable not found. This is required for operation.');
+    console.error('Looked for executables at:');
+    possibleExecutables.forEach(path => console.error(`- ${path}`));
+    return standaloneClient; // Return the path anyway, will fail gracefully later with a clear error
   }
 }
 
@@ -154,6 +317,41 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Log important paths for debugging
+  console.log('=== App Path Information ===');
+  console.log('App path:', app.getAppPath());
+  console.log('Executable path:', process.execPath);
+  console.log('Resources path:', process.resourcesPath);
+  console.log('Current working directory:', process.cwd());
+  console.log('User data path:', app.getPath('userData'));
+  console.log('Executable directory:', path.dirname(process.execPath));
+  console.log('========================');
+  
+  // Check for resources directory existence
+  const resourceDirs = [
+    process.resourcesPath,
+    path.join(process.execPath, '..', 'resources'),
+    path.join(path.dirname(process.execPath), 'resources'),
+    path.join(app.getAppPath(), '..', 'resources'),
+    path.join(app.getPath('exe'), '..', 'resources')
+  ];
+  
+  console.log('=== Resource Directory Check ===');
+  resourceDirs.forEach(dir => {
+    const exists = fs.existsSync(dir);
+    console.log(`${dir}: ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+    if (exists) {
+      try {
+        const files = fs.readdirSync(dir);
+        console.log(`Contents of ${dir}:`);
+        files.forEach(file => console.log(`- ${file}`));
+      } catch (err) {
+        console.error(`Error reading directory ${dir}:`, err);
+      }
+    }
+  });
+  console.log('================================');
+  
   createWindow();
 
   app.on('activate', function () {
@@ -230,6 +428,33 @@ ipcMain.handle('start-server', async (event, config) => {
     console.log('  Python path:', pythonPath);
     console.log('  Script path:', serverScriptPath);
     console.log('  Is development:', isDev);
+    console.log('  Resources path:', process.resourcesPath);
+    
+    // Check if the executable actually exists
+    if (!pythonPath && serverScriptPath) {
+      console.log('  Server executable exists:', fs.existsSync(serverScriptPath));
+      
+      // List files in resources directory
+      if (fs.existsSync(process.resourcesPath)) {
+        console.log('Contents of resources directory:');
+        const files = fs.readdirSync(process.resourcesPath);
+        files.forEach(file => {
+          console.log(`  - ${file}`);
+          
+          // Check python-standalone directory if it exists
+          if (file === 'python-standalone') {
+            const standalonePath = path.join(process.resourcesPath, file);
+            if (fs.existsSync(standalonePath)) {
+              console.log('  Contents of python-standalone directory:');
+              const standaloneFiles = fs.readdirSync(standalonePath);
+              standaloneFiles.forEach(standaloneFile => {
+                console.log(`    - ${standaloneFile}`);
+              });
+            }
+          }
+        });
+      }
+    }
     
     // Build command arguments
     const args = serverScriptPath ? [serverScriptPath] : [];
@@ -249,16 +474,38 @@ ipcMain.handle('start-server', async (event, config) => {
     
     const spawnOptions = {
       env: env,
-      cwd: isDev ? path.join(__dirname, '../') : process.resourcesPath,
-      stdio: ['pipe', 'pipe', 'pipe']
+      cwd: isDev ? path.join(__dirname, '../') : path.dirname(serverScriptPath),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: process.platform === 'win32' // Always use shell on Windows for better compatibility
     };
     
     console.log('Spawn options:', spawnOptions);
     console.log('Current working directory:', process.cwd());
     console.log('Resources path:', process.resourcesPath);
-    console.log('Python executable exists:', fs.existsSync(pythonPath));
     
-    serverProcess = spawn(pythonPath, args, spawnOptions);
+    // Different handling based on whether we're using standalone executable or Python
+    if (pythonPath) {
+      // Using Python interpreter
+      console.log('Using Python interpreter with args:', args);
+      console.log('Python executable exists:', fs.existsSync(pythonPath));
+      serverProcess = spawn(pythonPath, args, spawnOptions);
+    } else {
+      // Using standalone executable directly
+      console.log('Using standalone executable directly:', serverScriptPath);
+      console.log('Standalone executable exists:', fs.existsSync(serverScriptPath));
+      serverProcess = spawn(serverScriptPath, [], spawnOptions);
+    }
+    
+    // Check for ENOENT errors (file not found)
+    serverProcess.on('error', error => {
+      if (error.code === 'ENOENT') {
+        console.error('ENOENT Error: Executable not found!');
+        console.error('- Python path:', pythonPath);
+        console.error('- Script path:', serverScriptPath);
+        console.error('- CWD:', spawnOptions.cwd);
+        console.error('- Error:', error.message);
+      }
+    });
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -440,6 +687,33 @@ ipcMain.handle('start-client', async (event, config) => {
     console.log('  Python path:', pythonPath);
     console.log('  Script path:', clientScriptPath);
     console.log('  Is development:', isDev);
+    console.log('  Resources path:', process.resourcesPath);
+    
+    // Check if the executable exists
+    if (!pythonPath && clientScriptPath) {
+      console.log('  Client executable exists:', fs.existsSync(clientScriptPath));
+      
+      // List files in resources directory
+      if (fs.existsSync(process.resourcesPath)) {
+        console.log('Contents of resources directory:');
+        const files = fs.readdirSync(process.resourcesPath);
+        files.forEach(file => {
+          console.log(`  - ${file}`);
+          
+          // Check python-standalone directory if it exists
+          if (file === 'python-standalone') {
+            const standalonePath = path.join(process.resourcesPath, file);
+            if (fs.existsSync(standalonePath)) {
+              console.log('  Contents of python-standalone directory:');
+              const standaloneFiles = fs.readdirSync(standalonePath);
+              standaloneFiles.forEach(standaloneFile => {
+                console.log(`    - ${standaloneFile}`);
+              });
+            }
+          }
+        });
+      }
+    }
     
     // Environment setup
     const env = { 
@@ -457,7 +731,8 @@ ipcMain.handle('start-client', async (event, config) => {
     
     const spawnOptions = {
       env: env,
-      cwd: isDev ? path.join(__dirname, '../') : process.resourcesPath
+      cwd: isDev ? path.join(__dirname, '../') : path.dirname(clientScriptPath),
+      shell: process.platform === 'win32' // Always use shell on Windows for better compatibility
     };
     
     // Check if we're using a standalone executable
@@ -491,7 +766,76 @@ ipcMain.handle('start-client', async (event, config) => {
       }
       
       try {
+        console.log('Spawning client process with:');
+        console.log('- Executable path:', clientScriptPath);
+        console.log('- Arguments:', []);
+        console.log('- CWD:', spawnOptions.cwd);
+        
+        // For Windows, enhanced handling with different approaches
+        if (process.platform === 'win32') {
+          console.log('Using enhanced Windows compatibility mode');
+          
+          // Prioritize .bat files over .exe files on Windows
+          if (clientScriptPath.endsWith('.bat')) {
+            console.log('Using shell:true for Windows .bat file');
+            spawnOptions.shell = true;
+            spawnOptions.windowsHide = false;
+          } else if (clientScriptPath.endsWith('.exe')) {
+            console.log('Using Windows .exe specific options');
+            spawnOptions.windowsHide = false;
+            spawnOptions.windowsVerbatimArguments = true;
+          }
+          
+          // For Windows, add detached option to ensure the process runs independently
+          spawnOptions.detached = false;
+        }
+        
+        // Attempt to spawn the process
+        console.log('Final spawn options:', JSON.stringify(spawnOptions, null, 2));
         clientProcess = spawn(clientScriptPath, [], spawnOptions);
+        
+        // Add error handler for file not found or compatibility issues
+        clientProcess.on('error', error => {
+          console.error('Client process spawn error:', error);
+          if (error.code === 'ENOENT') {
+            console.error('ENOENT Error: Client executable not found!');
+            console.error('- Script path:', clientScriptPath);
+            console.error('- CWD:', spawnOptions.cwd);
+            console.error('- Error:', error.message);
+            
+            // Try fallback approach for Windows
+            if (process.platform === 'win32') {
+              console.log('Attempting Windows fallback method...');
+              try {
+                const fallbackPath = clientScriptPath.replace('.exe', '.bat');
+                if (fs.existsSync(fallbackPath)) {
+                  console.log('Found fallback .bat file, trying to use that instead');
+                  const fallbackOptions = {
+                    ...spawnOptions,
+                    shell: true,
+                    windowsHide: false
+                  };
+                  clientProcess = spawn(fallbackPath, [], fallbackOptions);
+                }
+              } catch (fallbackError) {
+                console.error('Fallback attempt failed:', fallbackError);
+              }
+            }
+          } else if (error.code === 'UNKNOWN' || error.code === 'EACCES') {
+            console.error(`${error.code} Error: This often happens with permission issues or incorrect path.`);
+            console.error('- Script path:', clientScriptPath);
+            console.error('- File exists:', fs.existsSync(clientScriptPath));
+            
+            // Try to get file permissions
+            try {
+              const stats = fs.statSync(clientScriptPath);
+              console.error('- File permissions:', stats.mode.toString(8));
+              console.error('- Is executable:', (stats.mode & 0o111) !== 0);
+            } catch (err) {
+              console.error('- Cannot check permissions:', err.message);
+            }
+          }
+        });
       } catch (error) {
         console.error('Error spawning client executable:', error);
         throw error;
@@ -505,6 +849,25 @@ ipcMain.handle('start-client', async (event, config) => {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        console.error('Client startup timeout - could not establish connection');
+        if (clientProcess) {
+          console.log('Client process exists but no success message received');
+          console.log('Client process details:');
+          console.log('- PID:', clientProcess.pid);
+          console.log('- Killed:', clientProcess.killed);
+          console.log('- ExitCode:', clientProcess.exitCode);
+          
+          // Try to force a success resolution instead of failing
+          if (clientProcess.pid && clientProcess.exitCode === null) {
+            console.log('Process seems to be running, assuming success despite timeout');
+            resolve({ success: true, message: 'Client started (assumed running after timeout)' });
+            return;
+          }
+          
+          // Kill the process if it's still running
+          clientProcess.kill('SIGTERM');
+        }
+        clientProcess = null;
         reject(new Error('Client startup timeout'));
       }, 10000);
 

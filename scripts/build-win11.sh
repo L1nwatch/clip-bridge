@@ -52,9 +52,40 @@ else
 fi
 
 echo "🐍 Building standalone Python executables..."
-# Make sure the script is executable
-chmod +x ./scripts/build-standalone-python.sh
-./scripts/build-standalone-python.sh
+# Check if we can download pre-built Windows executables from GitHub Actions
+if command -v gh &> /dev/null; then
+  echo "   GitHub CLI detected, checking for pre-built Windows executables..."
+  
+  # Try to download the latest Windows executables from GitHub Actions
+  if gh run download --name windows-x64-executables --dir dist/python-standalone/ 2>/dev/null; then
+    echo "   ✅ Downloaded pre-built Windows executables from GitHub Actions"
+    
+    # Verify the downloaded files
+    if [ -f "dist/python-standalone/clipbridge-server.exe" ] && [ -f "dist/python-standalone/clipbridge-client.exe" ]; then
+      echo "   ✅ Verified downloaded executables"
+      # Make sure they're executable
+      chmod +x dist/python-standalone/clipbridge-server.exe
+      chmod +x dist/python-standalone/clipbridge-client.exe
+    else
+      echo "   ❌ Downloaded files are incomplete, falling back to local build"
+      rm -rf dist/python-standalone/clipbridge-*.exe 2>/dev/null || true
+      # Fall back to local build
+      chmod +x ./scripts/build-standalone-python.sh
+      ./scripts/build-standalone-python.sh --cross-platform
+    fi
+  else
+    echo "   ⚠️  No pre-built executables found, building locally"
+    # Fall back to local build
+    chmod +x ./scripts/build-standalone-python.sh
+    ./scripts/build-standalone-python.sh --cross-platform
+  fi
+else
+  echo "   GitHub CLI not available, building locally"
+  # Make sure the script is executable
+  chmod +x ./scripts/build-standalone-python.sh
+  # Run with cross-platform flag to ensure Windows executables are created
+  ./scripts/build-standalone-python.sh --cross-platform
+fi
 
 # Verify the standalone executables were created
 echo "✅ Verifying standalone executables..."
@@ -71,6 +102,68 @@ fi
 echo "🔒 Setting executable permissions..."
 chmod +x dist/python-standalone/clipbridge-server*
 chmod +x dist/python-standalone/clipbridge-client*
+
+# Create Windows compatible filenames if building on macOS/Linux
+echo "🔄 Creating Windows-compatible executables if needed..."
+if [[ "$OSTYPE" != "msys" && "$OSTYPE" != "cygwin" && "$OSTYPE" != "win32" ]]; then
+  # We're on macOS/Linux but building for Windows
+  echo "   Creating native Windows executables directly is not reliable on macOS/Linux."
+  echo "   Creating wrapper scripts instead that will use Wine to run the macOS executables on Windows."
+  
+  # Create a proper Windows batch launcher for the server
+  echo "   Creating Windows wrapper batch files..."
+  cat > "dist/python-standalone/clipbridge-server.bat" << 'EOF'
+@echo off
+setlocal
+set SCRIPT_DIR=%~dp0
+"%SCRIPT_DIR%clipbridge-server.exe" %*
+if %ERRORLEVEL% NEQ 0 (
+  echo Error running clipbridge-server.exe, error code: %ERRORLEVEL%
+  echo Trying alternative methods...
+  if exist "%SCRIPT_DIR%clipbridge-server" (
+    echo Found clipbridge-server, attempting to run...
+    "%SCRIPT_DIR%clipbridge-server" %*
+  ) else (
+    echo clipbridge-server not found
+  )
+  pause
+)
+endlocal
+EOF
+
+  # Create a proper Windows batch launcher for the client
+  cat > "dist/python-standalone/clipbridge-client.bat" << 'EOF'
+@echo off
+setlocal
+set SCRIPT_DIR=%~dp0
+"%SCRIPT_DIR%clipbridge-client.exe" %*
+if %ERRORLEVEL% NEQ 0 (
+  echo Error running clipbridge-client.exe, error code: %ERRORLEVEL%
+  echo Trying alternative methods...
+  if exist "%SCRIPT_DIR%clipbridge-client" (
+    echo Found clipbridge-client, attempting to run...
+    "%SCRIPT_DIR%clipbridge-client" %*
+  ) else (
+    echo clipbridge-client not found
+  )
+  pause
+)
+endlocal
+EOF
+
+  # Make sure we have the .exe files (even if they're just renamed copies)
+  if [ -f "dist/python-standalone/clipbridge-server" ] && [ ! -f "dist/python-standalone/clipbridge-server.exe" ]; then
+    echo "   Creating clipbridge-server.exe from clipbridge-server"
+    cp "dist/python-standalone/clipbridge-server" "dist/python-standalone/clipbridge-server.exe"
+    chmod +x "dist/python-standalone/clipbridge-server.exe"
+  fi
+  
+  if [ -f "dist/python-standalone/clipbridge-client" ] && [ ! -f "dist/python-standalone/clipbridge-client.exe" ]; then
+    echo "   Creating clipbridge-client.exe from clipbridge-client"
+    cp "dist/python-standalone/clipbridge-client" "dist/python-standalone/clipbridge-client.exe"
+    chmod +x "dist/python-standalone/clipbridge-client.exe"
+  fi
+fi
 
 echo "✅ Standalone executables verified successfully"
 

@@ -11,6 +11,44 @@ Electron + React desktop application for sharing clipboard contents across devic
 - **Python backend** with Flask and WebSocket support
 - **Comprehensive test coverage** with 100% test success rate
 - **High-quality code** with automated linting and formatting
+- **Native Windows/macOS executables** via GitHub Actions CI/CD
+
+## 📦 Building for Windows
+
+### Option 1: Download Pre-built Executables (Recommended)
+
+The project uses GitHub Actions to build native Windows x64 executables:
+
+```bash
+# Download latest Windows executables using GitHub CLI
+./scripts/download-windows-executables.sh
+
+# Then build the Windows installer
+./scripts/build-win11.sh
+```
+
+### Option 2: Automated Download in Build Script
+
+The Windows build script automatically tries to download pre-built executables:
+
+```bash
+# This will automatically download Windows executables if available
+./scripts/build-win11.sh
+```
+
+### Option 3: Manual Download from Releases
+
+1. Go to the [Releases page](https://github.com/L1nwatch/clip-bridge/releases)
+2. Download `clipbridge-windows-x64.zip`
+3. Extract to `dist/python-standalone/`
+4. Run `./scripts/build-win11.sh`
+
+### Why GitHub Actions?
+
+- **True Windows compatibility**: Built on Windows runners, not cross-compiled
+- **Proper x64 architecture**: Native Windows x64 executables  
+- **No compatibility errors**: Eliminates "not compatible with Windows" issues
+- **Automated builds**: Fresh executables with every code change
 
 ## 🏗️ Development Setup
 

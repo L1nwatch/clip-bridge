@@ -18,7 +18,14 @@
   "extraResources": [
     {
       "from": "dist/python-standalone/",
-      "to": "python-standalone/",
+      "to": "python-standalone",
+      "filter": ["*"]
+    }
+  ],
+  "extraFiles": [
+    {
+      "from": "dist/python-standalone/",
+      "to": "resources/python-standalone",
       "filter": ["*"]
     }
   ],
@@ -45,7 +52,11 @@
       }
     ],
     "icon": "assets/icon.ico",
-    "requestedExecutionLevel": "asInvoker"
+    "requestedExecutionLevel": "asInvoker",
+    "artifactName": "${productName} Setup ${version}.exe",
+    "compression": "maximum",
+    "legalTrademarks": "ClipBridge",
+    "verifyUpdateCodeSignature": false
   },
   "linux": {
     "target": [
