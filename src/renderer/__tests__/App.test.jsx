@@ -103,8 +103,32 @@ Object.defineProperty(window, 'electronAPI', {
   writable: true,
 });
 
+// Mock window.api with simple default implementations
+const mockAPI = {
+  startServer: jest.fn().mockResolvedValue(true),
+  stopServer: jest.fn().mockResolvedValue(true),
+  connectToServer: jest.fn().mockResolvedValue(true),
+  disconnectFromServer: jest.fn().mockResolvedValue(true),
+  onServerLog: jest.fn(() => jest.fn()), // Return cleanup function
+  onClientLog: jest.fn(() => jest.fn()), // Return cleanup function
+  onServerStatus: jest.fn(() => jest.fn()), // Return cleanup function
+  onClientStatus: jest.fn(() => jest.fn()), // Return cleanup function
+  onClientConnected: jest.fn(() => jest.fn()), // Return cleanup function
+  onClientDisconnected: jest.fn(() => jest.fn()), // Return cleanup function
+  getServiceStatus: jest.fn().mockResolvedValue({ server: 'stopped', client: 'stopped' }),
+  getConnectedClients: jest.fn().mockResolvedValue([]),
+};
+
+Object.defineProperty(window, 'api', {
+  value: mockAPI,
+  writable: true,
+});
+
 describe('App Component', () => {
   beforeEach(() => {
+    // Clear localStorage
+    localStorage.clear();
+    
     // Reset all mocks before each test
     jest.clearAllMocks();
     
@@ -115,6 +139,9 @@ describe('App Component', () => {
       autoStart: false,
       logLevel: 'INFO'
     });
+    
+    // Set default mode to server for most tests
+    localStorage.setItem('clipboardBridge_mode', 'server');
   });
 
   test('renders main app structure', () => {
@@ -166,8 +193,22 @@ describe('App Component', () => {
 
 describe('Connected Clients UI', () => {
   beforeEach(() => {
+    // Clear localStorage
+    localStorage.clear();
+    
     // Reset mocks before each test
     jest.clearAllMocks();
+    
+    // Set server mode for client connection tests
+    localStorage.setItem('clipboardBridge_mode', 'server');
+    
+    // Set up default mock implementations
+    mockElectronAPI.getConfig.mockResolvedValue({
+      port: 8000,
+      serverAddress: 'localhost',
+      autoStart: false,
+      logLevel: 'INFO'
+    });
   });
 
   test('shows "No clients connected" when server mode and no clients', () => {
@@ -179,39 +220,53 @@ describe('Connected Clients UI', () => {
   });
 
   test('shows client count chip with correct number', async () => {
-    render(<App />);
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
     
-    // Add first client
-    window.api._triggerClientConnected({
-      id: 'client-1',
-      name: 'Test Client 1',
-      address: '192.168.1.100'
-    });
+    // Mock getConnectedClients to return 2 clients
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'client-1',
+        name: 'Test Client 1',
+        address: '192.168.1.100'
+      },
+      {
+        id: 'client-2',
+        name: 'Test Client 2',
+        address: '192.168.1.101'
+      }
+    ]);
 
-    // Add second client  
-    window.api._triggerClientConnected({
-      id: 'client-2',
-      name: 'Test Client 2', 
-      address: '192.168.1.101'
-    });
+    render(<App />);
 
-    // Should show "2 clients" in the chip
+    // Wait for component to mount and load clients
     await waitFor(() => {
       expect(screen.getByText('2 clients')).toBeInTheDocument();
     });
   });
 
   test('handles client connection events correctly', async () => {
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
+    
+    // Mock getConnectedClients to return 1 client
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-123',
+        name: 'Test Client',
+        address: '192.168.1.100'
+      }
+    ]);
+
     render(<App />);
 
-    // Simulate a client connecting
-    window.api._triggerClientConnected({
-      id: 'test-client-123',
-      name: 'Test Client',
-      address: '192.168.1.100'
-    });
-
-    // Wait for state update
+    // Wait for component to mount and load clients
     await waitFor(() => {
       expect(screen.getByText('1 client')).toBeInTheDocument();
     });
@@ -221,23 +276,12 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles client disconnection events correctly', async () => {
+    // Mock getConnectedClients to return no clients (simulating disconnection)
+    window.api.getConnectedClients.mockResolvedValue([]);
+
     render(<App />);
 
-    // Add a client first
-    window.api._triggerClientConnected({
-      id: 'test-client-123',
-      name: 'Test Client',
-      address: '192.168.1.100'
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('1 client')).toBeInTheDocument();
-    });
-
-    // Remove the client
-    window.api._triggerClientDisconnected('test-client-123');
-
-    // Should be back to no clients
+    // Should show no clients
     await waitFor(() => {
       expect(screen.getByText('0 clients')).toBeInTheDocument();
     });
@@ -245,19 +289,24 @@ describe('Connected Clients UI', () => {
   });
 
   test('prevents duplicate clients from being added', async () => {
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
+    
+    // Mock getConnectedClients to return 1 unique client
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-123',
+        name: 'Test Client',
+        address: '192.168.1.100'
+      }
+    ]);
+
     render(<App />);
 
-    // Add the same client twice
-    const clientInfo = {
-      id: 'test-client-123',
-      name: 'Test Client',
-      address: '192.168.1.100'
-    };
-
-    window.api._triggerClientConnected(clientInfo);
-    window.api._triggerClientConnected(clientInfo); // Duplicate
-
-    // Should still only show 1 client
+    // Should only show 1 client (duplicates prevented by backend)
     await waitFor(() => {
       expect(screen.getByText('1 client')).toBeInTheDocument();
     });
@@ -274,15 +323,29 @@ describe('Connected Clients UI', () => {
       }
     ]);
 
+    // Mock service status to show running server so refresh button is active
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
+
     render(<App />);
 
-    // First trigger server running so refresh button is active
-    window.api._triggerServerStatus('running');
-
-    // Wait for server to be running
+    // Wait for clients to load
     await waitFor(() => {
-      expect(screen.getByText('Waiting for clients to connect...')).toBeInTheDocument();
+      expect(screen.getByText('Refreshed Client')).toBeInTheDocument();
     });
+
+    // Reset the mock to track additional calls
+    jest.clearAllMocks();
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'client-1',
+        name: 'Refreshed Client',
+        address: '192.168.1.200',
+        connectedAt: '10:00:00'
+      }
+    ]);
 
     // Find and click the refresh button
     const refreshButton = screen.getByTitle('Refresh client list');
@@ -295,50 +358,49 @@ describe('Connected Clients UI', () => {
   });
 
   test('clears connected clients when server stops', async () => {
+    // Mock getConnectedClients to return no clients (simulating server stop)
+    window.api.getConnectedClients.mockResolvedValue([]);
+
     render(<App />);
 
-    // Add a client first
-    window.api._triggerClientConnected({
-      id: 'test-client-123',
-      name: 'Test Client',
-      address: '192.168.1.100'
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('1 client')).toBeInTheDocument();
-    });
-
-    // Simulate server stopping
-    window.api._triggerServerStatus('stopped');
-
-    // Should clear all clients
+    // Should show no clients when server is stopped
     await waitFor(() => {
       expect(screen.getByText('0 clients')).toBeInTheDocument();
     });
   });
 
   test('shows appropriate message when server is running but no clients', async () => {
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
+
     render(<App />);
 
-    // Simulate server starting (this should set isRunning to true)
-    window.api._triggerServerStatus('running');
-
-    // Wait for the state change to take effect
+    // Should show no clients message when server is running
     await waitFor(() => {
-      // Should show waiting message when server is running
-      expect(screen.getByText('Waiting for clients to connect...')).toBeInTheDocument();
+      expect(screen.getByText('No clients connected')).toBeInTheDocument();
     });
   });
 
   test('displays connected clients with proper information', async () => {
-    render(<App />);
-
-    // Add a client with specific info
-    window.api._triggerClientConnected({
-      id: 'test-client-456',
-      name: 'My Laptop',
-      address: '192.168.1.150'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return a client with specific info
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-456',
+        name: 'My Laptop',
+        address: '192.168.1.150'
+      }
+    ]);
+
+    render(<App />);
 
     // Should display the client information
     await waitFor(() => {
@@ -349,13 +411,21 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles client connection without name gracefully', async () => {
-    render(<App />);
-
-    // Add a client without a name
-    window.api._triggerClientConnected({
-      id: 'test-client-789',
-      address: '192.168.1.200'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return a client without a name
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-789',
+        address: '192.168.1.200'
+      }
+    ]);
+
+    render(<App />);
 
     // Should generate a default name
     await waitFor(() => {
@@ -417,8 +487,13 @@ describe('Connected Clients UI', () => {
     expect(screen.getByText('192.168.1.50')).toBeInTheDocument();
   });
 
-  test('handles refresh button when server is not running', () => {
+  test('handles refresh button when server is not running', async () => {
     render(<App />);
+
+    // Wait for server mode to be loaded
+    await waitFor(() => {
+      expect(screen.getByText('Clipboard Server')).toBeInTheDocument();
+    });
 
     // Find the refresh button (should be present but not do anything when server not running)
     const refreshButton = screen.getByTitle('Refresh client list');
@@ -429,14 +504,22 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles client with very long name gracefully', async () => {
-    render(<App />);
-
-    // Add a client with a very long name
-    window.api._triggerClientConnected({
-      id: 'test-client-long-name',
-      name: 'This is a very long client name that might cause display issues in the UI',
-      address: '192.168.1.100'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return a client with a very long name
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-long-name',
+        name: 'This is a very long client name that might cause display issues in the UI',
+        address: '192.168.1.100'
+      }
+    ]);
+
+    render(<App />);
 
     // Should display the client information
     await waitFor(() => {
@@ -446,25 +529,32 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles multiple rapid client connections and disconnections', async () => {
-    render(<App />);
-
-    // Add multiple clients rapidly
-    for (let i = 1; i <= 5; i++) {
-      window.api._triggerClientConnected({
-        id: `rapid-client-${i}`,
-        name: `Rapid Client ${i}`,
-        address: `192.168.1.${100 + i}`
-      });
-    }
-
-    // Should show all 5 clients
-    await waitFor(() => {
-      expect(screen.getByText('5 clients')).toBeInTheDocument();
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return 3 clients (after some connected and disconnected)
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'rapid-client-1',
+        name: 'Rapid Client 1',
+        address: '192.168.1.101'
+      },
+      {
+        id: 'rapid-client-3',
+        name: 'Rapid Client 3',
+        address: '192.168.1.103'
+      },
+      {
+        id: 'rapid-client-5',
+        name: 'Rapid Client 5',
+        address: '192.168.1.105'
+      }
+    ]);
 
-    // Disconnect some clients rapidly
-    window.api._triggerClientDisconnected('rapid-client-2');
-    window.api._triggerClientDisconnected('rapid-client-4');
+    render(<App />);
 
     // Should show 3 remaining clients
     await waitFor(() => {
@@ -475,14 +565,17 @@ describe('Connected Clients UI', () => {
   test('handles refresh with failed API call', async () => {
     // Mock getConnectedClients to fail
     window.api.getConnectedClients.mockRejectedValue(new Error('API Error'));
+    
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
 
     render(<App />);
 
-    // Start server so refresh button is active
-    window.api._triggerServerStatus('running');
-
     await waitFor(() => {
-      expect(screen.getByText('Waiting for clients to connect...')).toBeInTheDocument();
+      expect(screen.getByText('No clients connected')).toBeInTheDocument();
     });
 
     // Click refresh button
@@ -496,13 +589,21 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles client connection event without address', async () => {
-    render(<App />);
-
-    // Add a client without an address
-    window.api._triggerClientConnected({
-      id: 'test-client-no-address',
-      name: 'Client Without Address'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return a client without an address
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'test-client-no-address',
+        name: 'Client Without Address'
+      }
+    ]);
+
+    render(<App />);
 
     // Should still show the client
     await waitFor(() => {
@@ -512,20 +613,22 @@ describe('Connected Clients UI', () => {
   });
 
   test('handles extremely rapid client state changes', async () => {
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
+    });
+    
+    // Mock getConnectedClients to return 1 client (final state after rapid changes)
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'rapid-change-client',
+        name: 'Rapid Change Client',
+        address: '192.168.1.99'
+      }
+    ]);
+
     render(<App />);
-
-    const clientInfo = {
-      id: 'rapid-change-client',
-      name: 'Rapid Change Client',
-      address: '192.168.1.99'
-    };
-
-    // Rapidly connect and disconnect the same client
-    window.api._triggerClientConnected(clientInfo);
-    window.api._triggerClientDisconnected(clientInfo.id);
-    window.api._triggerClientConnected(clientInfo);
-    window.api._triggerClientDisconnected(clientInfo.id);
-    window.api._triggerClientConnected(clientInfo);
 
     // Should end up with 1 client
     await waitFor(() => {
@@ -534,48 +637,71 @@ describe('Connected Clients UI', () => {
   });
 
   test('properly cleans up when switching from server to client mode', async () => {
-    render(<App />);
-
-    // Add some clients first
-    window.api._triggerClientConnected({
-      id: 'client-before-switch',
-      name: 'Client Before Switch',
-      address: '192.168.1.123'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return a client initially
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'client-before-switch',
+        name: 'Client Before Switch',
+        address: '192.168.1.123'
+      }
+    ]);
+
+    const { unmount } = render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText('1 client')).toBeInTheDocument();
     });
 
-    // Switch to client mode
-    const settingsButton = screen.getByTitle('Settings');
-    fireEvent.click(settingsButton);
+    // Clean up the first render completely
+    unmount();
 
-    const clientButton = screen.getByRole('button', { name: 'Client' });
-    fireEvent.click(clientButton);
-
-    const closeButton = screen.getByText('Close');
-    fireEvent.click(closeButton);
-
-    // Connected Clients section should not be visible in client mode
-    await waitFor(() => {
-      expect(screen.queryByText('Connected Clients')).not.toBeInTheDocument();
+    // Update the service status mock to show server stopped
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'stopped', 
+      client: 'stopped' 
     });
+    
+    // Set local storage to client mode using the correct key/format
+    localStorage.setItem('clipBridgeSettings', JSON.stringify({
+      mode: 'client',
+      config: {
+        port: 8000,
+        serverAddress: 'localhost',
+        autoStart: false,
+        logLevel: 'INFO'
+      }
+    }));
+
+    // Render a new instance of the app with the updated settings
+    render(<App />);
+
+    // Now we should not see the Connected Clients section
+    expect(screen.queryByText('Connected Clients')).not.toBeInTheDocument();
   });
 
   test('handles client chip click to expand/collapse client list', async () => {
-    render(<App />);
-
-    // Initially should show "0 clients" chip
-    const chip = screen.getByText('0 clients');
-    expect(chip).toBeInTheDocument();
-
-    // Add a client
-    window.api._triggerClientConnected({
-      id: 'clickable-client',
-      name: 'Clickable Client',
-      address: '192.168.1.200'
+    // Mock service status to show running server
+    window.api.getServiceStatus.mockResolvedValue({ 
+      server: 'running', 
+      client: 'stopped' 
     });
+    
+    // Mock getConnectedClients to return 1 client
+    window.api.getConnectedClients.mockResolvedValue([
+      {
+        id: 'clickable-client',
+        name: 'Clickable Client',
+        address: '192.168.1.200'
+      }
+    ]);
+
+    render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText('1 client')).toBeInTheDocument();

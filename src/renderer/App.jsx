@@ -36,17 +36,48 @@ import ComputerIcon from '@mui/icons-material/Computer';
 
 import DeviceCard from './components/DeviceCard';
 
+// Load settings from localStorage with defaults
+const loadSettings = () => {
+  try {
+    const savedSettings = localStorage.getItem('clipBridgeSettings');
+    if (savedSettings) {
+      return JSON.parse(savedSettings);
+    }
+  } catch (error) {
+    console.warn('Failed to load settings from localStorage:', error);
+  }
+  
+  // Default settings
+  return {
+    mode: 'server',
+    config: {
+      port: 8000,
+      serverAddress: 'localhost',
+      autoStart: false,
+      logLevel: 'INFO'
+    }
+  };
+};
+
+// Save settings to localStorage
+const saveSettings = (mode, config) => {
+  try {
+    const settings = { mode, config };
+    localStorage.setItem('clipBridgeSettings', JSON.stringify(settings));
+  } catch (error) {
+    console.warn('Failed to save settings to localStorage:', error);
+  }
+};
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mode, setMode] = useState('server'); // 'server' or 'client'
+  
+  // Load initial settings from localStorage
+  const initialSettings = loadSettings();
+  const [mode, setMode] = useState(initialSettings.mode);
   const [isRunning, setIsRunning] = useState(false);
-  const [config, setConfig] = useState({
-    port: 8000,  // Server mode: port to run server on, Client mode: port server is running on
-    serverAddress: 'localhost',
-    autoStart: false,
-    logLevel: 'INFO'
-  });
+  const [config, setConfig] = useState(initialSettings.config);
   const [status, setStatus] = useState('idle'); // 'idle', 'starting', 'running', 'stopping', 'error'
   const [logs, setLogs] = useState([]);
   const [connectedDevices, setConnectedDevices] = useState([]);
@@ -69,6 +100,11 @@ export default function App() {
       }
     }
   }, [logs]);
+
+  // Save settings whenever mode or config changes
+  useEffect(() => {
+    saveSettings(mode, config);
+  }, [mode, config]);
 
   // Mock devices for demonstration
   const mockDevices = [
@@ -127,29 +163,37 @@ export default function App() {
     });
 
     // Check initial service status
-    window.api?.getServiceStatus?.().then(status => {
-      if (mode === 'server' && status.server === 'running') {
-        setIsRunning(true);
-        setStatus('running');
-        // Get initial connected clients if any
-        window.api?.getConnectedClients?.().then(clients => {
-          if (clients && clients.length > 0) {
-            setConnectedDevices(clients.map(client => ({
-              id: client.id,
-              name: client.name || `Client-${client.id.slice(0, 8)}`,
-              ip: client.address || 'Unknown',
-              status: 'connected',
-              connectedAt: client.connectedAt || 'Unknown'
-            })));
+    const serviceStatusPromise = window.api?.getServiceStatus?.();
+    if (serviceStatusPromise) {
+      serviceStatusPromise.then(status => {
+        if (mode === 'server' && status.server === 'running') {
+          setIsRunning(true);
+          setStatus('running');
+          // Get initial connected clients if any
+          const connectedClientsPromise = window.api?.getConnectedClients?.();
+          if (connectedClientsPromise) {
+            connectedClientsPromise.then(clients => {
+              if (clients && clients.length > 0) {
+                setConnectedDevices(clients.map(client => ({
+                  id: client.id,
+                  name: client.name || `Client-${client.id.slice(0, 8)}`,
+                  ip: client.address || 'Unknown',
+                  status: 'connected',
+                  connectedAt: client.connectedAt || 'Unknown'
+                })));
+              }
+            }).catch(() => {
+              // Ignore error, just means no clients or API not available
+            });
           }
-        }).catch(() => {
-          // Ignore error, just means no clients or API not available
-        });
-      } else if (mode === 'client' && status.client === 'running') {
-        setIsRunning(true);
-        setStatus('running');
-      }
-    });
+        } else if (mode === 'client' && status.client === 'running') {
+          setIsRunning(true);
+          setStatus('running');
+        }
+      }).catch(() => {
+        // Ignore error, API not available
+      });
+    }
 
     return () => {
       removeServerLogListener?.();
@@ -281,20 +325,23 @@ export default function App() {
                         onClick={() => {
                           // Refresh connected clients list
                           if (isRunning && mode === 'server') {
-                            window.api?.getConnectedClients?.().then(clients => {
-                              if (clients) {
-                                setConnectedDevices(clients.map(client => ({
-                                  id: client.id,
-                                  name: client.name || `Client-${client.id.slice(0, 8)}`,
-                                  ip: client.address || 'Unknown',
-                                  status: 'connected',
-                                  connectedAt: client.connectedAt || 'Unknown'
-                                })));
-                                addLog('Refreshed client list');
-                              }
-                            }).catch(() => {
-                              addLog('Failed to refresh client list');
-                            });
+                            const connectedClientsPromise = window.api?.getConnectedClients?.();
+                            if (connectedClientsPromise) {
+                              connectedClientsPromise.then(clients => {
+                                if (clients) {
+                                  setConnectedDevices(clients.map(client => ({
+                                    id: client.id,
+                                    name: client.name || `Client-${client.id.slice(0, 8)}`,
+                                    ip: client.address || 'Unknown',
+                                    status: 'connected',
+                                    connectedAt: client.connectedAt || 'Unknown'
+                                  })));
+                                  addLog('Refreshed client list');
+                                }
+                              }).catch(() => {
+                                addLog('Failed to refresh client list');
+                              });
+                            }
                           }
                         }}
                         title="Refresh client list"
