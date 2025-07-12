@@ -13,7 +13,12 @@ export default defineConfig([
       globals: {
         ...globals.node,
         ...globals.es2021
-      }
+      },
+      ecmaVersion: 2021,
+      sourceType: "script"
+    },
+    rules: {
+      "no-console": "off" // Allow console.log in Node.js scripts
     }
   },
   // Browser environment for renderer process files
