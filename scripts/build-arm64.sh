@@ -7,7 +7,7 @@ echo "🚀 Starting ClipBridge ARM64 Mac build..."
 
 # Step 1: Clean previous builds
 echo "🧹 Cleaning previous builds..."
-rm -rf dist/electron/*
+rm -rf dist/electron build
 
 # Step 2: Ensure icons are present
 echo "🎨 Checking application icons..."
@@ -109,15 +109,14 @@ img.save('assets/icon.png')
     # Create ICNS and ICO files
     mkdir -p assets/iconset.iconset
     sizes=(16 32 128 256 512)
-    for size in "\${sizes[@]}"; do
-        sips -z \$size \$size assets/icon.png --out assets/iconset.iconset/icon_\${size}x\${size}.png >/dev/null 2>&1
-        if [ \$size -le 256 ]; then
-            double_size=\$((size * 2))
-            sips -z \$double_size \$double_size assets/icon.png --out assets/iconset.iconset/icon_\${size}x\${size}@2x.png >/dev/null 2>&1
+    for size in "${sizes[@]}"; do
+        sips -z $size $size assets/icon.png --out assets/iconset.iconset/icon_${size}x${size}.png >/dev/null 2>&1
+        if [ $size -le 256 ]; then
+            double_size=$((size * 2))
+            sips -z $double_size $double_size assets/icon.png --out assets/iconset.iconset/icon_${size}x${size}@2x.png >/dev/null 2>&1
         fi
     done
-    iconutil -c icns assets/iconset.iconset --output assets/icon.icns >/dev/null 2>&1
-    rm -rf assets/iconset.iconset
+    iconutil -c icns assets/iconset.iconset --output assets/icon.icns >/dev/null 2>&1 && rm -rf assets/iconset.iconset
     
     python3 -c "
 from PIL import Image
@@ -134,19 +133,18 @@ fi
 
 # Step 3: Build Python executable
 echo "🐍 Building Python server executable..."
-cd utils
-pyinstaller server.spec
-cd ..
+cd utils && pyinstaller server.spec && cd ..
 
 # Step 4: Build React app and Electron DMG (ARM64 only)
 echo "⚛️  Building React app and Electron DMG..."
-npm run dist:mac:arm64
+npm run build:clean && npx electron-builder --mac --arm64
 
-# Step 5: Clean up unnecessary files
-echo "🧽 Cleaning up unnecessary files..."
+# Step 5: Clean up artifacts - keep only final .dmg file
+echo "🧽 Cleaning build artifacts..."
 cd dist/electron
-rm -f builder-debug.yml builder-effective-config.yaml latest-mac.yml *.blockmap
-rm -rf mac-arm64
+find . -type f ! -name '*.dmg' ! -name '*.exe' -delete
+rm -rf mac* win* linux* *.yml *.yaml
+find . -type d -empty -delete
 cd ../..
 
 # Step 6: Show results

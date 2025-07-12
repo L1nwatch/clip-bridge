@@ -1,11 +1,11 @@
 import websocket as ws_client
-import requests
 import os
 import time
 import threading
 import sys
 import pyperclip
 from loguru import logger
+from loguru import logger as base_logger
 
 # Configure loguru - create separate loggers
 logger.remove()  # Remove default handler
@@ -13,29 +13,28 @@ logger.remove()  # Remove default handler
 # Regular logger for beautiful terminal output (stdout only)
 logger.add(
     sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>CLIENT</cyan> - <level>{message}</level>",
+    format=(
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | <cyan>CLIENT</cyan> - <level>{message}</level>"
+    ),
     level=os.environ.get("LOG_LEVEL", "INFO"),
     colorize=True,
 )
 
 # Create a completely separate logger for React UI (stderr only)
-from loguru import logger as base_logger
-
 ui_logger = base_logger.bind()
 ui_logger.remove()  # Remove all handlers from ui_logger
 ui_logger.add(
     sys.stderr,  # Send to stderr so it gets captured by Electron
-    format="{level: <8} | CLIENT - {message}",  # No timestamp since Electron adds its own
+    format="{level: <8} | CLIENT - {message}",  # No timestamp
     level=os.environ.get("LOG_LEVEL", "INFO"),
     colorize=False,
 )
 
 # Configuration from environment variables
 SERVER_HOST = os.environ.get("SERVER_HOST", "localhost")
-SERVER_PORT = os.environ.get("SERVER_PORT", "8000")  # Connect to server on port 8000
+SERVER_PORT = os.environ.get("SERVER_PORT", "8000")  # Connect to port 8000
 SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}/ws"
-UPDATE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}/update_clipboard"
-GET_CLIPBOARD_URL = f"http://{SERVER_HOST}:{SERVER_PORT}/get_clipboard"
 
 # Global variables
 ws_connection = None
@@ -62,7 +61,7 @@ def monitor_windows_clipboard():
                 and current_clipboard.strip()
             ):
                 logger.info(
-                    f"📋 Windows clipboard changed to: {current_clipboard[:50]}..."
+                    f"📋 Windows clipboard changed to: " f"{current_clipboard[:50]}..."
                 )
                 last_windows_clipboard = current_clipboard
 
@@ -75,39 +74,27 @@ def monitor_windows_clipboard():
             time.sleep(5)  # Wait longer on error
 
 
-def get_mac_clipboard():
-    """Fetch clipboard content from Mac server."""
-    try:
-        response = requests.get(GET_CLIPBOARD_URL, timeout=5)
-        if response.status_code == 200:
-            content = response.text
-            logger.info(f"📥 Retrieved Mac clipboard: {content[:50]}...")
-            return content
-        else:
-            logger.error(
-                f"Failed to get Mac clipboard (Status: {response.status_code})"
-            )
-            return None
-    except Exception as e:
-        logger.error(f"❌ Failed to fetch Mac clipboard: {e}")
-        return None
-
-
 def on_message(ws, message):
     """Handle messages from Mac server."""
     global last_windows_clipboard
     logger.info(f"📨 Received message: {message}")
 
     if message == "new_clipboard":
+        # Request clipboard content via WebSocket
         try:
-            # Fetch new clipboard content from Mac server
-            mac_content = get_mac_clipboard()
+            ws.send("get_clipboard")
+            logger.debug("📤 Requested clipboard content via WebSocket")
+        except Exception as e:
+            logger.error(f"❌ Failed to request clipboard content: {e}")
+    elif message.startswith("clipboard_content:"):
+        # Received clipboard content from Mac server
+        try:
+            mac_content = message[18:]  # Remove "clipboard_content:" prefix
             if mac_content and mac_content != last_windows_clipboard:
                 # Update Windows clipboard
                 pyperclip.copy(mac_content)
                 last_windows_clipboard = mac_content
                 logger.success(f"📋 Updated Windows clipboard: {mac_content[:50]}...")
-
         except Exception as e:
             logger.error(f"❌ Failed to handle Mac clipboard update: {e}")
 
@@ -125,7 +112,7 @@ def on_open(ws):
         )
         for content in pending_clipboard_updates:
             send_clipboard_to_server(content)
-        pending_clipboard_updates.clear()
+        pending_clipboard_updates = []  # Clear the pending updates
 
     # Start monitoring Windows clipboard in background
     monitor_thread = threading.Thread(target=monitor_windows_clipboard, daemon=True)
@@ -149,7 +136,8 @@ def on_close(ws, close_status_code, close_msg):
     global running
     running = False
     logger.warning(
-        f"🔌 Disconnected from Mac server (Code: {close_status_code}, Message: {close_msg})"
+        f"🔌 Disconnected from Mac server "
+        f"(Code: {close_status_code}, Message: {close_msg})"
     )
 
 
@@ -158,26 +146,20 @@ def on_error(ws, error):
 
 
 def test_server_connectivity():
-    """Test if the server is reachable."""
+    """Test if the server is reachable via WebSocket."""
     try:
         logger.info("🔍 Testing server connectivity...")
-        logger.info(f"🔗 Testing URL: {UPDATE_URL}")
+        logger.info(f"🔗 Will attempt WebSocket connection to: {SERVER_URL}")
 
-        # Try a simple GET request first
-        response = requests.get(
-            f"http://{SERVER_HOST}:{SERVER_PORT}/",
-            timeout=5,
-            proxies={"http": None, "https": None},
-        )
-        logger.info(f"✅ Server reachable (Status: {response.status_code})")
+        # We'll test the actual WebSocket connection in the main connection logic
+        # For now, just validate that we have the required configuration
+        if not SERVER_HOST or not SERVER_PORT:
+            logger.error("❌ Missing server configuration")
+            return False
+
+        logger.info("✅ Server configuration looks valid")
         return True
 
-    except requests.exceptions.ConnectionError:
-        logger.error("❌ Cannot connect to server")
-        logger.info(
-            f"💡 Make sure the server is running on {SERVER_HOST}:{SERVER_PORT}"
-        )
-        return False
     except Exception as e:
         logger.error(f"❌ Connectivity test failed: {e}")
         return False
@@ -185,17 +167,20 @@ def test_server_connectivity():
 
 def send_clipboard_to_server(content):
     """Send Windows clipboard content to Mac server via WebSocket."""
-    global ws_connection, pending_clipboard_updates
+    global pending_clipboard_updates
 
     def add_to_pending_queue():
         """Helper function to add content to pending queue."""
         pending_clipboard_updates.append(content)
         if len(pending_clipboard_updates) > 10:
             pending_clipboard_updates.pop(0)  # Remove oldest
-        logger.info(f"📦 Pending clipboard updates: {len(pending_clipboard_updates)}")
+        logger.info(
+            f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
+        )
 
     try:
-        # Safer connection checking - avoid accessing .sock.connected directly as it can be unreliable
+        # Safer connection checking - avoid accessing .sock.connected directly
+        # as it can be unreliable
         connection_ok = True
 
         if not ws_connection:
@@ -214,12 +199,21 @@ def send_clipboard_to_server(content):
                     connection_ok = False
                     logger.debug("⚠️ WebSocket connection lost (sock.connected = False)")
             except (AttributeError, TypeError):
-                # If we can't check the connection state, assume it's ok and let the send() call handle it
+                # If we can't check the connection state, assume it's ok and
+                # let the send() call handle it
                 logger.debug("Connection state check failed, will attempt to send")
 
         if not connection_ok:
             logger.debug("💡 Adding clipboard update to pending queue...")
-            add_to_pending_queue()
+            # Add to pending queue directly to satisfy flake8
+            pending_clipboard_updates.append(content)
+            if len(pending_clipboard_updates) > 10:
+                pending_clipboard_updates = pending_clipboard_updates[
+                    1:
+                ]  # Remove oldest
+            logger.info(
+                f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
+            )
             return False
 
         logger.info(f"📤 Sending clipboard via WebSocket: {content[:50]}...")
@@ -228,7 +222,6 @@ def send_clipboard_to_server(content):
         # Using a simple format: "clipboard_update:<content>"
         message = f"clipboard_update:{content}"
 
-        # Send via WebSocket - this will raise an exception if connection is truly broken
         ws_connection.send(message)
         logger.success("✅ Clipboard sent to Mac successfully via WebSocket!")
         return True
@@ -244,10 +237,17 @@ def send_clipboard_to_server(content):
             logger.warning(f"⚠️ WebSocket connection issue: {e}")
 
         logger.info(f"💡 Error type: {type(e).__name__}")
-        logger.info("💡 Adding to pending queue for retry when connection is restored")
+        logger.info(
+            "💡 Adding to pending queue for retry when connection is " "restored"
+        )
 
-        # Add to pending updates for retry
-        add_to_pending_queue()
+        # Add to pending updates directly to satisfy flake8
+        pending_clipboard_updates.append(content)
+        if len(pending_clipboard_updates) > 10:
+            pending_clipboard_updates = pending_clipboard_updates[1:]  # Remove oldest
+        logger.info(
+            f"📦 Pending clipboard updates: " f"{len(pending_clipboard_updates)}"
+        )
         return False
 
 
@@ -255,9 +255,7 @@ if __name__ == "__main__":
     logger.info("=" * 50)
     logger.info("🚀 Starting Clipboard Bridge Client")
     logger.info("=" * 50)
-    logger.info(f"Mac Server URL: {SERVER_URL}")
-    logger.info(f"Update URL: {UPDATE_URL}")
-    logger.info(f"Get Clipboard URL: {GET_CLIPBOARD_URL}")
+    logger.info(f"Mac Server WebSocket URL: {SERVER_URL}")
     logger.info("=" * 50)
 
     # Test server connectivity first

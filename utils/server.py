@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # clipboard_server.py
 
-from flask import Flask, request, jsonify
-import subprocess
+from flask import Flask, request
 import threading
 import os
-import json
 import time
 import sys
 import pyperclip
@@ -13,6 +11,7 @@ from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
 from loguru import logger
+import loguru
 
 # Configuration from environment variables
 PORT = int(os.environ.get("PORT", "8000"))  # Server default port
@@ -24,14 +23,17 @@ logger.remove()  # Remove default handler
 # Regular logger for beautiful terminal output (stdout only)
 logger.add(
     sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    format=(
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+        "<level>{message}</level>"
+    ),
     level=LOG_LEVEL,
     colorize=True,
 )
 
 # Create a completely separate logger instance for React UI
-import loguru
-
 ui_logger = loguru.logger
 ui_logger.remove()  # Remove all default handlers
 ui_logger.add(
@@ -127,19 +129,34 @@ def websocket_app(environ, start_response):
                         )
 
                         # Handle different message types
-                        if message.startswith("clipboard_update:"):
+                        if message == "ping":
+                            ws.send("pong")
+                            logger.debug("Sent pong response")
+                        elif message == "get_clipboard":
+                            # Client is requesting current clipboard content
+                            current_clipboard = get_clipboard()
+                            response = f"clipboard_content:{current_clipboard}"
+                            ws.send(response)
+                            logger.info(
+                                f"📋 Sent clipboard content to client: "
+                                f"{current_clipboard[:50]}..."
+                            )
+                        elif message.startswith("clipboard_update:"):
                             # Extract clipboard content from the message
                             clipboard_content = message[len("clipboard_update:") :]
                             logger.info(
-                                f"📋 Received clipboard update via WebSocket: {clipboard_content[:50]}..."
+                                f"📋 Received clipboard update via WebSocket: "
+                                f"{clipboard_content[:50]}..."
                             )
                             set_clipboard(clipboard_content)
                         else:
                             # Legacy format - treat entire message as clipboard content
-                            logger.info(
-                                f"📋 Received legacy clipboard message: {message[:50]}..."
-                            )
-                            set_clipboard(message)
+                            if not message.startswith(("pong", "ping")):
+                                logger.info(
+                                    f"📋 Received legacy clipboard message: "
+                                    f"{message[:50]}..."
+                                )
+                                set_clipboard(message)
 
                 except WebSocketError as e:
                     logger.error(f"WebSocket error: {e}")
@@ -160,7 +177,8 @@ def websocket_app(environ, start_response):
             with lock:
                 websocket_clients.discard(ws)
                 logger.info(
-                    f"Client {client_addr} disconnected. Total clients: {len(websocket_clients)}"
+                    f"Client {client_addr} disconnected. "
+                    f"Total clients: {len(websocket_clients)}"
                 )
 
         return []

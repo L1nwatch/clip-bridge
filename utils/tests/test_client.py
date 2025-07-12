@@ -24,7 +24,6 @@ class TestClipboardClient:
         assert client.SERVER_HOST is not None
         assert client.SERVER_PORT is not None
         assert client.SERVER_URL is not None
-        assert client.UPDATE_URL is not None
 
     @mock.patch.dict(os.environ, {"SERVER_HOST": "testhost", "SERVER_PORT": "9000"})
     def test_custom_environment_configuration(self):
@@ -36,35 +35,27 @@ class TestClipboardClient:
 
         assert "testhost" in client.SERVER_URL
         assert "9000" in client.SERVER_URL
-        assert "9000" in client.UPDATE_URL
 
     def test_on_message_callback(self):
         """Test WebSocket message callback."""
         mock_ws = MagicMock()
 
-        with patch("client.requests.get") as mock_get:
-            mock_response = MagicMock()
-            mock_response.text = "test clipboard content"
-            mock_response.status_code = 200
-            mock_get.return_value = mock_response
+        # Test new_clipboard message (should send get_clipboard request)
+        client.on_message(mock_ws, "new_clipboard")
+        mock_ws.send.assert_called_with("get_clipboard")
 
-            # Test the on_message function
-            client.on_message(mock_ws, "new_clipboard")
-
-            # Verify that a request was made to fetch clipboard
-            mock_get.assert_called_once_with(client.GET_CLIPBOARD_URL, timeout=5)
+        # Test clipboard_content message
+        with patch("client.pyperclip.copy") as mock_copy:
+            client.on_message(mock_ws, "clipboard_content:test content")
+            mock_copy.assert_called_with("test content")
 
     def test_on_message_with_exception(self):
-        """Test WebSocket message callback with network exception."""
+        """Test WebSocket message callback with send exception."""
         mock_ws = MagicMock()
+        mock_ws.send.side_effect = Exception("WebSocket error")
 
-        with patch("client.requests.get") as mock_get:
-            mock_get.side_effect = Exception("Network error")
-
-            # Should not raise exception
-            client.on_message(mock_ws, "new_clipboard")
-
-            mock_get.assert_called_once_with(client.GET_CLIPBOARD_URL, timeout=5)
+        # Should not raise exception
+        client.on_message(mock_ws, "new_clipboard")
 
     def test_on_open_callback(self):
         """Test WebSocket connection open callback."""
@@ -228,13 +219,10 @@ class TestClipboardClient:
         assert hasattr(client, "SERVER_HOST")
         assert hasattr(client, "SERVER_PORT")
         assert hasattr(client, "SERVER_URL")
-        assert hasattr(client, "UPDATE_URL")
 
         # Verify URL format
         assert client.SERVER_URL.startswith("ws://")
         assert "/ws" in client.SERVER_URL
-        assert client.UPDATE_URL.startswith("http://")
-        assert "/update_clipboard" in client.UPDATE_URL
 
     def test_logger_configuration(self):
         """Test that loggers are properly configured."""
