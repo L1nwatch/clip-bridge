@@ -26,7 +26,7 @@ fi
 echo "📥 Fetching latest Windows build artifacts..."
 
 # Download the latest Windows executables
-if gh run download --name windows-executables --dir dist/python-standalone/ 2>/dev/null; then
+if gh run download --name windows-python-executables --dir dist/python-standalone/ 2>/dev/null; then
     echo "✅ Successfully downloaded Windows executables!"
     
     # Verify the files

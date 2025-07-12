@@ -57,7 +57,7 @@ if command -v gh &> /dev/null; then
   echo "   GitHub CLI detected, checking for pre-built Windows executables..."
   
   # Try to download the latest Windows executables from GitHub Actions
-  if gh run download --name windows-x64-executables --dir dist/python-standalone/ 2>/dev/null; then
+  if gh run download --name windows-python-executables --dir dist/python-standalone/ 2>/dev/null; then
     echo "   ✅ Downloaded pre-built Windows executables from GitHub Actions"
     
     # Verify the downloaded files
