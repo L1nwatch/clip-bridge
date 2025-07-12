@@ -5,6 +5,13 @@
 
 echo "🚀 Starting ClipBridge Windows 11 build..."
 
+# Step 0: Check if Python is installed
+if ! command -v python3 &> /dev/null; then
+  echo "❌ ERROR: Python 3 is not installed or not in PATH. Please install Python 3 and try again."
+  exit 1
+fi
+echo "✅ Python 3 is installed"
+
 # Step 1: Clean previous builds
 echo "🧹 Cleaning previous builds..."
 # Safety check: Make sure we're in the project directory
@@ -24,8 +31,29 @@ if [ -d "build" ]; then
   rm -rf build
 fi
 
-# Step 2: Build standalone Python executables
+# Step 2: Set up Python environment and build standalone executables
+echo "🐍 Setting up Python virtual environment..."
+# Check if virtual environment exists, create if it doesn't
+if [ ! -d "utils/.venv" ]; then
+  echo "   Creating new Python virtual environment..."
+  python3 -m venv utils/.venv
+  
+  echo "   Installing dependencies in virtual environment..."
+  source utils/.venv/bin/activate
+  if ! pip install -r utils/requirements.txt; then
+    echo "❌ ERROR: Failed to install Python dependencies. Please check utils/requirements.txt and try again."
+    deactivate
+    exit 1
+  fi
+  deactivate
+  echo "✅ Python environment set up successfully"
+else
+  echo "   Python virtual environment already exists"
+fi
+
 echo "🐍 Building standalone Python executables..."
+# Make sure the script is executable
+chmod +x ./scripts/build-standalone-python.sh
 ./scripts/build-standalone-python.sh
 
 # Verify the standalone executables were created
@@ -38,6 +66,12 @@ if [ ! -f "dist/python-standalone/clipbridge-client" ] && [ ! -f "dist/python-st
   echo "❌ ERROR: Standalone client executable was not created!"
   exit 1
 fi
+
+# Ensure executables have proper permissions
+echo "🔒 Setting executable permissions..."
+chmod +x dist/python-standalone/clipbridge-server*
+chmod +x dist/python-standalone/clipbridge-client*
+
 echo "✅ Standalone executables verified successfully"
 
 # Step 3: Install npm dependencies
@@ -93,6 +127,12 @@ if [ -d "dist/electron" ]; then
         rm -rf "$dir"
       fi
     done
+    
+    # Remove win-unpacked directory
+    if [ -d "win-unpacked" ]; then
+      echo "   Removing win-unpacked directory..."
+      rm -rf win-unpacked
+    fi
     
     # Remove YAML files separately
     rm -f *.yml *.yaml

@@ -15,10 +15,40 @@ function getPythonExecutablePath() {
     // In development, use Python from virtual environment
     return process.platform === 'win32' ? 'python' : 'python3';
   } else {
-    // In production, always fallback to system Python if we're on a different platform
-    // This handles the case where we built on macOS but need to run on Windows
-    console.log('Using system Python for cross-platform compatibility');
-    return process.platform === 'win32' ? 'python' : 'python3';
+    // In production, check if we have standalone executables
+    const resourcesPath = process.resourcesPath;
+    const standaloneServer = process.platform === 'win32' 
+      ? path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe')
+      : path.join(resourcesPath, 'python-standalone', 'clipbridge-server');
+    
+    console.log('Checking for standalone executable at:', standaloneServer);
+    
+    // List all files in the directory to debug
+    try {
+      const dir = path.dirname(standaloneServer);
+      if (fs.existsSync(dir)) {
+        console.log('Contents of python-standalone directory:');
+        const files = fs.readdirSync(dir);
+        files.forEach(file => {
+          console.log('  -', file);
+        });
+      } else {
+        console.log('python-standalone directory does not exist:', dir);
+      }
+    } catch (err) {
+      console.error('Error listing directory:', err);
+    }
+    
+    // If the standalone executable exists, we'll use it directly (returning null)
+    // Our startServer function will handle this special case
+    if (fs.existsSync(standaloneServer)) {
+      console.log('Using standalone Python executable:', standaloneServer);
+      return null; // Special marker that we're using standalone exe
+    } else {
+      // Fallback to system Python if standalone not available
+      console.log('Standalone executable not found, falling back to system Python');
+      return process.platform === 'win32' ? 'python' : 'python3';
+    }
   }
 }
 
@@ -27,9 +57,19 @@ function getPythonScriptPath() {
     // In development, use the actual Python files
     return path.join(__dirname, '..', 'utils', 'server.py');
   } else {
-    // In production, always use the bundled script (not executable)
+    // Check if we have standalone executables
     const resourcesPath = process.resourcesPath;
-    return path.join(resourcesPath, 'python', 'server.py');
+    const standaloneServer = process.platform === 'win32' 
+      ? path.join(resourcesPath, 'python-standalone', 'clipbridge-server.exe')
+      : path.join(resourcesPath, 'python-standalone', 'clipbridge-server');
+      
+    if (fs.existsSync(standaloneServer)) {
+      return standaloneServer; // Return the path to the standalone executable
+    } else {
+      // Log error instead of falling back
+      console.error('Standalone server executable not found. This is required for operation.');
+      return standaloneServer; // Return the path anyway, will fail gracefully later with a clear error
+    }
   }
 }
 
@@ -37,8 +77,19 @@ function getClientScriptPath() {
   if (isDev) {
     return path.join(__dirname, '..', 'utils', 'client.py');
   } else {
+    // Check if we have standalone executables
     const resourcesPath = process.resourcesPath;
-    return path.join(resourcesPath, 'python', 'client.py');
+    const standaloneClient = process.platform === 'win32' 
+      ? path.join(resourcesPath, 'python-standalone', 'clipbridge-client.exe')
+      : path.join(resourcesPath, 'python-standalone', 'clipbridge-client');
+      
+    if (fs.existsSync(standaloneClient)) {
+      return standaloneClient; // Return the path to the standalone executable
+    } else {
+      // Log error instead of falling back
+      console.error('Standalone client executable not found. This is required for operation.');
+      return standaloneClient; // Return the path anyway, will fail gracefully later with a clear error
+    }
   }
 }
 
@@ -385,17 +436,72 @@ ipcMain.handle('start-client', async (event, config) => {
     const pythonPath = getPythonExecutablePath();
     const clientScriptPath = getClientScriptPath();
     
-    clientProcess = spawn(pythonPath, [clientScriptPath], {
-      env: { 
-        ...process.env,
-        SERVER_HOST: config.serverAddress,
-        SERVER_PORT: config.port.toString(),
-        LOG_LEVEL: config.logLevel || 'INFO',
-        PYTHONUNBUFFERED: '1',
-        PYTHONPATH: isDev ? 'utils/.venv/lib/python3.9/site-packages' : undefined
-      },
+    console.log('Starting client with:');
+    console.log('  Python path:', pythonPath);
+    console.log('  Script path:', clientScriptPath);
+    console.log('  Is development:', isDev);
+    
+    // Environment setup
+    const env = { 
+      ...process.env,
+      SERVER_HOST: config.serverAddress,
+      SERVER_PORT: config.port.toString(),
+      LOG_LEVEL: config.logLevel || 'INFO',
+      PYTHONUNBUFFERED: '1'
+    };
+    
+    // Only add PYTHONPATH in development
+    if (isDev) {
+      env.PYTHONPATH = 'utils/.venv/lib/python3.9/site-packages';
+    }
+    
+    const spawnOptions = {
+      env: env,
       cwd: isDev ? path.join(__dirname, '../') : process.resourcesPath
-    });
+    };
+    
+    // Check if we're using a standalone executable
+    if (!pythonPath && !isDev) {
+      // Using standalone executable - don't need Python args
+      console.log('Using standalone client executable:', clientScriptPath);
+      console.log('Standalone executable exists:', fs.existsSync(clientScriptPath));
+      console.log('Current working directory:', process.cwd());
+      console.log('Resources path:', process.resourcesPath);
+      
+      // List files in the python-standalone directory to help with debugging
+      try {
+        const dir = path.dirname(clientScriptPath);
+        if (fs.existsSync(dir)) {
+          console.log('Contents of python-standalone directory:');
+          const files = fs.readdirSync(dir);
+          files.forEach(file => {
+            console.log('  -', file);
+          });
+        } else {
+          console.error('python-standalone directory does not exist:', dir);
+        }
+      } catch (err) {
+        console.error('Error listing directory:', err);
+      }
+      
+      // Check for file existence and permissions
+      if (!fs.existsSync(clientScriptPath)) {
+        console.error('Client executable not found at:', clientScriptPath);
+        throw new Error(`Client executable not found at: ${clientScriptPath}`);
+      }
+      
+      try {
+        clientProcess = spawn(clientScriptPath, [], spawnOptions);
+      } catch (error) {
+        console.error('Error spawning client executable:', error);
+        throw error;
+      }
+    } else {
+      // Using Python interpreter
+      console.log('Using Python interpreter');
+      console.log('Python executable exists:', fs.existsSync(pythonPath));
+      clientProcess = spawn(pythonPath, [clientScriptPath], spawnOptions);
+    }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
