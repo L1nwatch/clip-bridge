@@ -176,7 +176,7 @@ jobs:
         
         # Copy DMG file to root for release
         cd macos-complete
-        cp *.dmg ../ 2>/dev/null || echo "No DMG files found"
+        cp electron/*.dmg ../ 2>/dev/null || echo "No DMG files found"
         cd ..
         
         # List all files
