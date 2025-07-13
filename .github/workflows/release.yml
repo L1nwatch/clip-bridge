@@ -29,21 +29,38 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r utils/requirements.txt
         pip install pyinstaller
         
-    - name: Build Windows executables
+    - name: Build standalone Python executables
       run: |
         mkdir -p dist/python-standalone
         cd utils
         pyinstaller --onefile --distpath ../dist/python-standalone server.py --name clipbridge-server.exe --clean
         pyinstaller --onefile --distpath ../dist/python-standalone client.py --name clipbridge-client.exe --clean
         
-    - name: Verify executables
+    - name: Install Node.js dependencies
+      run: npm install
+      
+    - name: Build React application and Electron Windows installer
       run: |
+        # Build React app and copy Electron files
+        npm run build:clean
+        
+        # Build Electron Windows installer (NSIS)
+        npx electron-builder --win --x64 --config config/electron-builder.json
+        
+    - name: Verify all builds
+      run: |
+        echo "=== Python Executables ==="
         if (Test-Path "dist/python-standalone/clipbridge-server.exe") {
           $size = (Get-Item "dist/python-standalone/clipbridge-server.exe").Length
           Write-Host "✅ clipbridge-server.exe created (Size: $([math]::Round($size/1MB, 2)) MB)"
@@ -58,6 +75,16 @@ jobs:
           Write-Host "❌ clipbridge-client.exe not found"; exit 1
         }
         
+        echo "=== Electron Windows Installer ==="
+        if (Test-Path "dist/electron/*.exe") {
+          Get-ChildItem "dist/electron/*.exe" | ForEach-Object {
+            $size = $_.Length
+            Write-Host "✅ $($_.Name) created (Size: $([math]::Round($size/1MB, 2)) MB)"
+          }
+        } else {
+          Write-Host "❌ No Windows installer files found"; exit 1
+        }
+        
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -65,6 +92,7 @@ jobs:
         path: |
           dist/python-standalone/clipbridge-server.exe
           dist/python-standalone/clipbridge-client.exe
+          dist/electron/*.exe
 
   build-macos:
     runs-on: macos-latest
@@ -169,9 +197,18 @@ jobs:
         
     - name: Create release packages
       run: |
-        # Create Windows package
+        # Create Windows packages
         cd windows-executables
-        zip -r ../clipbridge-windows-x64.zip .
+        
+        # Create Python executables ZIP
+        mkdir python-tools
+        cp clipbridge-*.exe python-tools/ 2>/dev/null || echo "No Python executables found"
+        if [ -d "python-tools" ] && [ "$(ls -A python-tools)" ]; then
+          zip -r ../clipbridge-windows-python-tools.zip python-tools/
+        fi
+        
+        # Copy Windows installer to root
+        cp electron/*.exe ../ 2>/dev/null || echo "No Windows installer found"
         cd ..
         
         # Copy DMG file to root for release
@@ -181,7 +218,7 @@ jobs:
         
         # List all files
         echo "=== Release files ==="
-        ls -la *.zip *.dmg 2>/dev/null || echo "Some files may be missing"
+        ls -la *.zip *.dmg *.exe 2>/dev/null || echo "Some files may be missing"
         
     - name: Generate release tag
       id: tag
@@ -208,7 +245,8 @@ jobs:
         prerelease: false
         generate_release_notes: true
         files: |
-          clipbridge-windows-x64.zip
+          clipbridge-windows-python-tools.zip
+          *.exe
           *.dmg
         body: |
           # ClipBridge ${{ steps.tag.outputs.tag }}
@@ -216,8 +254,9 @@ jobs:
           ## Downloads
           
           ### Windows (x64)
-          - **clipbridge-windows-x64.zip** - Contains `clipbridge-server.exe` and `clipbridge-client.exe`
-          - These are native Windows x64 executables that don't require Python to be installed
+          - **ClipBridge Setup 0.1.0.exe** - Complete Windows application installer with GUI and embedded Python tools
+          - **clipbridge-windows-python-tools.zip** - Standalone Python command-line tools (`clipbridge-server.exe` and `clipbridge-client.exe`)
+          - Native Windows x64 executables that don't require Python to be installed
           
           ### macOS (Apple Silicon)
           - **ClipBridge-0.1.0-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
@@ -227,7 +266,13 @@ jobs:
           ## Installation
           
           ### Windows
-          1. Download `clipbridge-windows-x64.zip`
+          **Option 1: Full Application (Recommended)**
+          1. Download `ClipBridge Setup 0.1.0.exe`
+          2. Run the installer and follow the setup wizard
+          3. Launch ClipBridge from Start Menu or Desktop shortcut
+          
+          **Option 2: Standalone Tools**
+          1. Download `clipbridge-windows-python-tools.zip`
           2. Extract the files to a directory of your choice
           3. Run the executables directly (`clipbridge-server.exe` or `clipbridge-client.exe`)
           
