@@ -22,13 +22,6 @@
       "filter": ["*"]
     }
   ],
-  "extraFiles": [
-    {
-      "from": "dist/python-standalone/",
-      "to": "resources/python-standalone",
-      "filter": ["*"]
-    }
-  ],
   "mac": {
     "category": "public.app-category.productivity",
     "target": [
