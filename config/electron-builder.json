@@ -32,10 +32,10 @@
     ],
     "minimumSystemVersion": "10.15",
     "icon": "assets/icon.icns",
-    "entitlements": "assets/entitlements.mac.plist",
-    "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
-    "hardenedRuntime": true,
-    "gatekeeperAssess": false
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false,
+    "identity": null,
+    "type": "distribution"
   },
   "win": {
     "target": [

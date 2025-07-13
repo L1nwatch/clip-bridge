@@ -279,7 +279,11 @@ jobs:
           ### macOS
           1. Download the `.dmg` file
           2. Open the DMG and drag ClipBridge to Applications folder
-          3. Launch ClipBridge from Applications - all functionality included
+          3. **Important**: If you get a "damaged app" error, right-click the app and select "Open", then click "Open" in the dialog
+          4. Alternative: Run `sudo xattr -rd com.apple.quarantine /Applications/ClipBridge.app` in Terminal
+          5. Launch ClipBridge from Applications - all functionality included
+          
+          > **Note**: This app is not code-signed, so macOS may show security warnings. This is normal for open-source apps distributed outside the App Store.
           
           Built on: $(date +'%Y-%m-%d %H:%M:%S UTC')
       env:
