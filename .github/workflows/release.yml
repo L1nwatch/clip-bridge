@@ -202,9 +202,20 @@ jobs:
         
         # Create Python executables ZIP
         mkdir python-tools
-        cp clipbridge-*.exe python-tools/ 2>/dev/null || echo "No Python executables found"
+        # Copy Python executables from the correct path structure
+        find . -name "clipbridge-server.exe" -exec cp {} python-tools/ \;
+        find . -name "clipbridge-client.exe" -exec cp {} python-tools/ \;
+        
+        # Verify files were copied and create ZIP
+        echo "Files in python-tools directory:"
+        ls -la python-tools/
+        
         if [ -d "python-tools" ] && [ "$(ls -A python-tools)" ]; then
           zip -r ../clipbridge-windows-python-tools.zip python-tools/
+          echo "✅ Created clipbridge-windows-python-tools.zip"
+        else
+          echo "❌ No Python executables found for ZIP creation"
+          exit 1
         fi
         
         # Copy Windows installer to root
@@ -216,9 +227,22 @@ jobs:
         cp electron/*.dmg ../ 2>/dev/null || echo "No DMG files found"
         cd ..
         
-        # List all files
+        # Debug: List all available files
+        echo "=== Debug: All downloaded files ==="
+        find . -name "*.exe" -o -name "*.dmg" -o -name "*.zip" | sort
+        
+        # List all files for release
         echo "=== Release files ==="
         ls -la *.zip *.dmg *.exe 2>/dev/null || echo "Some files may be missing"
+        
+        # Verify the ZIP file was created
+        if [ -f "clipbridge-windows-python-tools.zip" ]; then
+          echo "✅ clipbridge-windows-python-tools.zip is ready for release"
+          unzip -l clipbridge-windows-python-tools.zip
+        else
+          echo "❌ clipbridge-windows-python-tools.zip was not created"
+          exit 1
+        fi
         
     - name: Generate release tag
       id: tag
@@ -228,6 +252,11 @@ jobs:
         else
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
+        
+    - name: Generate build date
+      id: date
+      run: |
+        echo "date=$(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
         
     - name: Debug Token Permissions
       run: |
@@ -285,7 +314,7 @@ jobs:
           
           > **Note**: This app is not code-signed, so macOS may show security warnings. This is normal for open-source apps distributed outside the App Store.
           
-          Built on: $(date +'%Y-%m-%d %H:%M:%S UTC')
+          Built on: ${{ steps.date.outputs.date }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
@@ -294,7 +323,7 @@ jobs:
       run: |
         gh release create ${{ steps.tag.outputs.tag }} \
           --title "ClipBridge ${{ steps.tag.outputs.tag }}" \
-          --notes "Cross-platform clipboard synchronization tool - Built on $(date +'%Y-%m-%d %H:%M:%S UTC')" \
+          --notes "Cross-platform clipboard synchronization tool - Built on ${{ steps.date.outputs.date }}" \
           clipbridge-windows-x64.zip \
           *.dmg
       env:
