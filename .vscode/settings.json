@@ -1,0 +1,49 @@
+{
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/build/**": true
+  },
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "files.hotExit": "onExitAndWindowClose",
+  "files.restoreUndoStack": true,
+  "files.refactoring.autoSave": true,
+  "workbench.editor.closeOnFileDelete": false,
+  "files.useExperimentalFileWatcher": true,
+  "editor.acceptSuggestionOnEnter": "on",
+  "files.associations": {
+    "scripts/*.js": "javascript"
+  },
+  
+  // Use configuration files from config/ folder
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "typescript.suggest.includeAutomaticOptionalChainCompletions": true,
+  
+  // Point to jsconfig.json in config folder
+  "js/ts.implicitProjectConfig.checkJs": true,
+  "js/ts.implicitProjectConfig.target": "ES2021",
+  
+  // JavaScript specific settings
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "javascript.validate.enable": true,
+  "javascript.preferences.importModuleSpecifier": "relative",
+  
+  // ESLint settings - point to config folder
+  "eslint.enable": true,
+  "eslint.format.enable": true,
+  "eslint.options": {
+    "overrideConfigFile": "./config/eslint.config.mjs"
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}

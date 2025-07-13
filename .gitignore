@@ -27,7 +27,8 @@ clipbridge-server.exe
 
 # IDEs and editors
 .idea/
-.vscode/
+.vscode/settings.local.json
+.vscode/launch.json
 .history/
 
 # Coverage
