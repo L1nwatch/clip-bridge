@@ -322,10 +322,10 @@ class TestServerCoverage:
             server.notify_clients()
 
             # Working client should be called
-            working_client.send.assert_called_with("new_clipboard")
+            working_client.send.assert_called_with(b"new_clipboard")
 
             # Failing client should be removed (this happens in the actual function)
-            failing_client.send.assert_called_with("new_clipboard")
+            failing_client.send.assert_called_with(b"new_clipboard")
 
     def test_combined_app_routing(self):
         """Test the combined WSGI app routing logic."""
@@ -423,7 +423,7 @@ class TestIntegrationCoverage:
 
             # 1. Client receives new_clipboard notification
             client.on_message(mock_client_ws, "new_clipboard")
-            mock_client_ws.send.assert_called_with("get_clipboard")
+            mock_client_ws.send.assert_called_with(b"get_clipboard")
 
             # 2. Server handles get_clipboard request
             with patch("server.get_clipboard") as mock_server_get:

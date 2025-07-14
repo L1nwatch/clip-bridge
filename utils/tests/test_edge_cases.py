@@ -42,18 +42,18 @@ class TestClientEdgeCases:
 
         # Test with empty content
         result = client.send_clipboard_to_server("")
-        mock_ws.send.assert_called_with("clipboard_update:")
+        mock_ws.send.assert_called_with(b"clipboard_update:")
         assert result is True
 
         # Test with very long content
         long_content = "x" * 10000
         client.send_clipboard_to_server(long_content)
-        mock_ws.send.assert_called_with(f"clipboard_update:{long_content}")
+        mock_ws.send.assert_called_with(f"clipboard_update:{long_content}".encode('utf-8'))
 
         # Test with unicode content
         unicode_content = "Hello 世界 🌍 émojis"
         client.send_clipboard_to_server(unicode_content)
-        mock_ws.send.assert_called_with(f"clipboard_update:{unicode_content}")
+        mock_ws.send.assert_called_with(f"clipboard_update:{unicode_content}".encode('utf-8'))
 
     def test_monitor_windows_clipboard_error_handling(self):
         """Test clipboard monitoring with various error scenarios."""
@@ -130,7 +130,7 @@ class TestClientEdgeCases:
         with patch("client.pyperclip.copy") as mock_copy:
             # Test new_clipboard message type (should send get_clipboard)
             client.on_message(mock_ws, "new_clipboard")
-            mock_ws.send.assert_called_with("get_clipboard")
+            mock_ws.send.assert_called_with(b"get_clipboard")
 
             # Reset mock
             mock_ws.reset_mock()
@@ -171,7 +171,7 @@ class TestServerEdgeCases:
 
             # Test None
             server.set_clipboard(None)
-            mock_copy.assert_called_with(None)
+            mock_copy.assert_called_with('None')
 
             # Test unicode content
             unicode_content = "Unicode: 你好 🌍 café"
@@ -212,9 +212,9 @@ class TestServerEdgeCases:
             server.notify_clients()
 
             # All clients should have been attempted
-            mock_client1.send.assert_called_once_with("new_clipboard")
-            mock_client2.send.assert_called_once_with("new_clipboard")
-            mock_client3.send.assert_called_once_with("new_clipboard")
+            mock_client1.send.assert_called_once_with(b"new_clipboard")
+            mock_client2.send.assert_called_once_with(b"new_clipboard")
+            mock_client3.send.assert_called_once_with(b"new_clipboard")
 
     def test_notify_clients_with_message_parameter(self):
         """Test notify_clients with default message."""
@@ -222,7 +222,7 @@ class TestServerEdgeCases:
 
         with patch.object(server, "websocket_clients", {mock_client}):
             server.notify_clients()
-            mock_client.send.assert_called_once_with("new_clipboard")
+            mock_client.send.assert_called_once_with(b"new_clipboard")
 
     def test_monitor_mac_clipboard_edge_cases(self):
         """Test clipboard monitoring with edge cases."""
@@ -344,7 +344,7 @@ class TestIntegrationScenarios:
         result = client.send_clipboard_to_server(test_content)
 
         # Verify WebSocket send was called with correct format
-        mock_ws.send.assert_called_once_with(f"clipboard_update:{test_content}")
+        mock_ws.send.assert_called_once_with(f"clipboard_update:{test_content}".encode('utf-8'))
         assert result is True
 
         # Test server setting clipboard

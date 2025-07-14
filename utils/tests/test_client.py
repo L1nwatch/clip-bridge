@@ -42,7 +42,7 @@ class TestClipboardClient:
 
         # Test new_clipboard message (should send get_clipboard request)
         client.on_message(mock_ws, "new_clipboard")
-        mock_ws.send.assert_called_with("get_clipboard")
+        mock_ws.send.assert_called_with(b"get_clipboard")
 
         # Test clipboard_content message
         with patch("client.pyperclip.copy") as mock_copy:
@@ -116,8 +116,8 @@ class TestClipboardClient:
 
         # Verify pending updates were processed (sent via WebSocket)
         expected_calls = [
-            call("clipboard_update:pending content 1"),
-            call("clipboard_update:pending content 2"),
+            call(b"clipboard_update:pending content 1"),
+            call(b"clipboard_update:pending content 2"),
         ]
         mock_ws.send.assert_has_calls(expected_calls)
 
@@ -140,7 +140,7 @@ class TestClipboardClient:
         result = client.send_clipboard_to_server(test_content)
 
         # Verify WebSocket send was called with correct format
-        expected_message = f"clipboard_update:{test_content}"
+        expected_message = f"clipboard_update:{test_content}".encode('utf-8')
         mock_ws.send.assert_called_once_with(expected_message)
         assert result is True
 

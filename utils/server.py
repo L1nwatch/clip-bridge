@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # clipboard_server.py
 
 from flask import Flask, request
@@ -44,6 +45,7 @@ ui_logger.add(
 )
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # Enable UTF-8 for JSON responses
 
 
 # Add CORS support
@@ -94,6 +96,14 @@ def monitor_mac_clipboard():
 
 def _handle_websocket_message(ws, message, client_addr):
     """Handle individual WebSocket messages."""
+    # Ensure message is properly decoded as UTF-8 string
+    if isinstance(message, bytes):
+        try:
+            message = message.decode('utf-8')
+        except UnicodeDecodeError as e:
+            logger.error(f"Failed to decode WebSocket message as UTF-8: {e}")
+            return
+    
     if message == "ping":
         ws.send("pong")
         logger.debug("Sent pong response")
@@ -101,7 +111,8 @@ def _handle_websocket_message(ws, message, client_addr):
         # Client is requesting current clipboard content
         current_clipboard = get_clipboard()
         response = f"clipboard_content:{current_clipboard}"
-        ws.send(response)
+        # Ensure response is sent as UTF-8
+        ws.send(response.encode('utf-8') if isinstance(response, str) else response)
         logger.info(f"📋 Sent clipboard content to client: {current_clipboard[:50]}...")
     elif message.startswith("clipboard_update:"):
         # Extract clipboard content from the message
@@ -204,7 +215,9 @@ def notify_clients():
         disconnected_clients = []
         for client in list(websocket_clients):
             try:
-                client.send("new_clipboard")
+                # Ensure notification is sent as UTF-8
+                message = "new_clipboard"
+                client.send(message.encode('utf-8') if isinstance(message, str) else message)
                 logger.debug("Successfully notified client")
             except Exception as e:
                 logger.warning(f"Failed to notify client: {e}")
@@ -220,24 +233,41 @@ def notify_clients():
 
 def set_clipboard(data):
     """
-    Set the clipboard content (cross-platform).
+    Set the clipboard content (cross-platform) with UTF-8 encoding.
     """
     try:
+        # Ensure data is properly encoded as UTF-8 string
+        if isinstance(data, bytes):
+            data = data.decode('utf-8')
+        elif not isinstance(data, str):
+            data = str(data)
+        
         pyperclip.copy(data)
         logger.info(f"Clipboard updated with: {data[:50]}...")
+    except UnicodeDecodeError as e:
+        logger.error(f"Failed to decode clipboard data as UTF-8: {e}")
     except Exception as e:
         logger.error(f"Failed to set clipboard: {e}")
 
 
 def get_clipboard(log_retrieval=True):
     """
-    Get the current clipboard content (cross-platform).
+    Get the current clipboard content (cross-platform) with UTF-8 encoding.
     """
     try:
         content = pyperclip.paste()
+        # Ensure content is properly handled as UTF-8 string
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+        elif content is None:
+            content = ""
+        
         if log_retrieval:
             logger.info(f"Retrieved clipboard content: {content[:50]}...")
         return content
+    except UnicodeDecodeError as e:
+        logger.error(f"Failed to decode clipboard content as UTF-8: {e}")
+        return ""
     except Exception as e:
         logger.error(f"Failed to get clipboard: {e}")
         return ""
@@ -246,22 +276,39 @@ def get_clipboard(log_retrieval=True):
 @app.route("/")
 def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "ClipBridge Server", "version": "1.0"}, 200
+    response_data = {"status": "ok", "service": "ClipBridge Server", "version": "1.0"}
+    response = app.response_class(
+        response=app.json.dumps(response_data, ensure_ascii=False),
+        status=200,
+        mimetype='application/json; charset=utf-8'
+    )
+    return response
 
 
 @app.route("/health")
 def health_endpoint():
     """Dedicated health check endpoint."""
-    return {"status": "healthy", "service": "ClipBridge Server", "version": "1.0"}, 200
+    response_data = {"status": "healthy", "service": "ClipBridge Server", "version": "1.0"}
+    response = app.response_class(
+        response=app.json.dumps(response_data, ensure_ascii=False),
+        status=200,
+        mimetype='application/json; charset=utf-8'
+    )
+    return response
 
 
 @app.route("/get_clipboard", methods=["GET"])
 def get_clipboard_content():
-    """Get current clipboard content."""
+    """Get current clipboard content with UTF-8 encoding."""
     try:
         content = get_clipboard(log_retrieval=True)  # Log when explicitly requested
         logger.info(f"Sending clipboard content: {content[:50]}...")
-        return content, 200
+        # Ensure response is UTF-8 encoded
+        response = app.response_class(
+            content,
+            mimetype='text/plain; charset=utf-8'
+        )
+        return response, 200
     except Exception as e:
         logger.error(f"Failed to get clipboard: {e}")
         return "Error getting clipboard", 500
@@ -283,8 +330,17 @@ def update_clipboard():
     logger.info(f"📊 Content length: {request.content_length}")
 
     try:
-        # Get the content from the request
+        # Get the content from the request with explicit UTF-8 decoding
         content = request.get_data(as_text=True)
+        
+        # Ensure content is properly decoded as UTF-8
+        if isinstance(content, bytes):
+            try:
+                content = content.decode('utf-8')
+            except UnicodeDecodeError as e:
+                logger.error(f"Failed to decode request content as UTF-8: {e}")
+                return "Invalid UTF-8 encoding", 400
+        
         logger.info(f"📝 Received content length: {len(content) if content else 0}")
 
         if content:

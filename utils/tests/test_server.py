@@ -115,11 +115,11 @@ class TestClipboardServer:
         server.notify_clients()
 
         # Verify successful clients received the message
-        mock_client1.send.assert_called_once_with("new_clipboard")
-        mock_client2.send.assert_called_once_with("new_clipboard")
+        mock_client1.send.assert_called_once_with(b"new_clipboard")
+        mock_client2.send.assert_called_once_with(b"new_clipboard")
 
         # Verify failed client was attempted and removed from set
-        mock_client3.send.assert_called_once_with("new_clipboard")
+        mock_client3.send.assert_called_once_with(b"new_clipboard")
         assert mock_client3 not in server.websocket_clients
 
     def test_get_clipboard_content(self):
