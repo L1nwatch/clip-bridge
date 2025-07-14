@@ -54,10 +54,10 @@ def monitor_windows_clipboard():
         last_windows_clipboard = pyperclip.paste()
         # Ensure clipboard content is UTF-8 string
         if isinstance(last_windows_clipboard, bytes):
-            last_windows_clipboard = last_windows_clipboard.decode('utf-8')
+            last_windows_clipboard = last_windows_clipboard.decode("utf-8")
         elif last_windows_clipboard is None:
             last_windows_clipboard = ""
-        
+
         logger.info(f"📋 Initial Windows clipboard: {last_windows_clipboard[:50]}...")
     except Exception as e:
         # Handle case where clipboard is not available (CI environments, etc.)
@@ -76,10 +76,10 @@ def monitor_windows_clipboard():
             current_clipboard = pyperclip.paste()
             # Ensure clipboard content is UTF-8 string
             if isinstance(current_clipboard, bytes):
-                current_clipboard = current_clipboard.decode('utf-8')
+                current_clipboard = current_clipboard.decode("utf-8")
             elif current_clipboard is None:
                 current_clipboard = ""
-            
+
             if (
                 current_clipboard != last_windows_clipboard
                 and current_clipboard.strip()
@@ -110,7 +110,7 @@ def _handle_new_clipboard_request(ws):
     try:
         # Send UTF-8 encoded message
         message = "get_clipboard"
-        ws.send(message.encode('utf-8') if isinstance(message, str) else message)
+        ws.send(message.encode("utf-8") if isinstance(message, str) else message)
         logger.debug("📤 Requested clipboard content via WebSocket")
     except Exception as e:
         logger.error(f"❌ Failed to request clipboard content: {e}")
@@ -123,8 +123,8 @@ def _handle_clipboard_content(message):
     try:
         # Ensure message is UTF-8 string
         if isinstance(message, bytes):
-            message = message.decode('utf-8')
-        
+            message = message.decode("utf-8")
+
         mac_content = message[18:]  # Remove "clipboard_content:" prefix
         if not mac_content or mac_content == last_windows_clipboard:
             return  # No update needed
@@ -152,11 +152,11 @@ def on_message(ws, message):
     # Ensure message is properly decoded as UTF-8
     if isinstance(message, bytes):
         try:
-            message = message.decode('utf-8')
+            message = message.decode("utf-8")
         except UnicodeDecodeError as e:
             logger.error(f"Failed to decode message as UTF-8: {e}")
             return
-    
+
     logger.info(f"📨 Received message: {message}")
 
     if message == "new_clipboard":
@@ -286,10 +286,10 @@ def send_clipboard_to_server(content):
     try:
         # Ensure content is UTF-8 string
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
+            content = content.decode("utf-8")
         elif not isinstance(content, str):
             content = str(content)
-        
+
         if not _is_connection_valid():
             logger.debug("💡 Adding clipboard update to pending queue...")
             _add_to_pending_queue(content)
@@ -300,7 +300,7 @@ def send_clipboard_to_server(content):
         # Create a message with clipboard content and ensure UTF-8 encoding
         message = f"clipboard_update:{content}"
         # Send as UTF-8 encoded bytes
-        ws_connection.send(message.encode('utf-8'))
+        ws_connection.send(message.encode("utf-8"))
         logger.success("✅ Clipboard sent to Mac successfully via WebSocket!")
         return True
 

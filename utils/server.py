@@ -45,7 +45,7 @@ ui_logger.add(
 )
 
 app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False  # Enable UTF-8 for JSON responses
+app.config["JSON_AS_ASCII"] = False  # Enable UTF-8 for JSON responses
 
 
 # Add CORS support
@@ -99,11 +99,11 @@ def _handle_websocket_message(ws, message, client_addr):
     # Ensure message is properly decoded as UTF-8 string
     if isinstance(message, bytes):
         try:
-            message = message.decode('utf-8')
+            message = message.decode("utf-8")
         except UnicodeDecodeError as e:
             logger.error(f"Failed to decode WebSocket message as UTF-8: {e}")
             return
-    
+
     if message == "ping":
         ws.send("pong")
         logger.debug("Sent pong response")
@@ -112,7 +112,7 @@ def _handle_websocket_message(ws, message, client_addr):
         current_clipboard = get_clipboard()
         response = f"clipboard_content:{current_clipboard}"
         # Ensure response is sent as UTF-8
-        ws.send(response.encode('utf-8') if isinstance(response, str) else response)
+        ws.send(response.encode("utf-8") if isinstance(response, str) else response)
         logger.info(f"📋 Sent clipboard content to client: {current_clipboard[:50]}...")
     elif message.startswith("clipboard_update:"):
         # Extract clipboard content from the message
@@ -217,7 +217,9 @@ def notify_clients():
             try:
                 # Ensure notification is sent as UTF-8
                 message = "new_clipboard"
-                client.send(message.encode('utf-8') if isinstance(message, str) else message)
+                client.send(
+                    message.encode("utf-8") if isinstance(message, str) else message
+                )
                 logger.debug("Successfully notified client")
             except Exception as e:
                 logger.warning(f"Failed to notify client: {e}")
@@ -238,10 +240,10 @@ def set_clipboard(data):
     try:
         # Ensure data is properly encoded as UTF-8 string
         if isinstance(data, bytes):
-            data = data.decode('utf-8')
+            data = data.decode("utf-8")
         elif not isinstance(data, str):
             data = str(data)
-        
+
         pyperclip.copy(data)
         logger.info(f"Clipboard updated with: {data[:50]}...")
     except UnicodeDecodeError as e:
@@ -258,10 +260,10 @@ def get_clipboard(log_retrieval=True):
         content = pyperclip.paste()
         # Ensure content is properly handled as UTF-8 string
         if isinstance(content, bytes):
-            content = content.decode('utf-8')
+            content = content.decode("utf-8")
         elif content is None:
             content = ""
-        
+
         if log_retrieval:
             logger.info(f"Retrieved clipboard content: {content[:50]}...")
         return content
@@ -280,7 +282,7 @@ def health_check():
     response = app.response_class(
         response=app.json.dumps(response_data, ensure_ascii=False),
         status=200,
-        mimetype='application/json; charset=utf-8'
+        mimetype="application/json; charset=utf-8",
     )
     return response
 
@@ -288,11 +290,15 @@ def health_check():
 @app.route("/health")
 def health_endpoint():
     """Dedicated health check endpoint."""
-    response_data = {"status": "healthy", "service": "ClipBridge Server", "version": "1.0"}
+    response_data = {
+        "status": "healthy",
+        "service": "ClipBridge Server",
+        "version": "1.0",
+    }
     response = app.response_class(
         response=app.json.dumps(response_data, ensure_ascii=False),
         status=200,
-        mimetype='application/json; charset=utf-8'
+        mimetype="application/json; charset=utf-8",
     )
     return response
 
@@ -304,10 +310,7 @@ def get_clipboard_content():
         content = get_clipboard(log_retrieval=True)  # Log when explicitly requested
         logger.info(f"Sending clipboard content: {content[:50]}...")
         # Ensure response is UTF-8 encoded
-        response = app.response_class(
-            content,
-            mimetype='text/plain; charset=utf-8'
-        )
+        response = app.response_class(content, mimetype="text/plain; charset=utf-8")
         return response, 200
     except Exception as e:
         logger.error(f"Failed to get clipboard: {e}")
@@ -332,15 +335,15 @@ def update_clipboard():
     try:
         # Get the content from the request with explicit UTF-8 decoding
         content = request.get_data(as_text=True)
-        
+
         # Ensure content is properly decoded as UTF-8
         if isinstance(content, bytes):
             try:
-                content = content.decode('utf-8')
+                content = content.decode("utf-8")
             except UnicodeDecodeError as e:
                 logger.error(f"Failed to decode request content as UTF-8: {e}")
                 return "Invalid UTF-8 encoding", 400
-        
+
         logger.info(f"📝 Received content length: {len(content) if content else 0}")
 
         if content:
