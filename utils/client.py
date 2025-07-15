@@ -1,4 +1,31 @@
 # -*- coding: utf-8 -*-
+
+import os
+import sys
+
+# Force UTF-8 encoding for all I/O operations - MUST be at the top
+import locale
+try:
+    # Set locale to UTF-8
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+except locale.Error:
+    try:
+        # Fallback for different systems
+        locale.setlocale(locale.LC_ALL, 'UTF-8')
+    except locale.Error:
+        pass  # Use system default if UTF-8 not available
+
+# Force environment encoding
+os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+os.environ.setdefault('LANG', 'en_US.UTF-8')
+os.environ.setdefault('LC_ALL', 'en_US.UTF-8')
+
+# Force stdout/stderr to use UTF-8
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import websocket as ws_client
 import os
 import time
@@ -121,19 +148,35 @@ def _handle_clipboard_content(message):
     global last_windows_clipboard
 
     try:
+        # Debug: log the raw message
+        logger.debug(f"🔍 Raw message type: {type(message)}")
+        logger.debug(f"🔍 Raw message repr: {repr(message)}")
+        
         # Ensure message is UTF-8 string
         if isinstance(message, bytes):
             message = message.decode("utf-8")
+            logger.debug(f"🔍 Decoded message: {repr(message)}")
 
-        mac_content = message[18:]  # Remove "clipboard_content:" prefix
+        # Debug: log prefix removal
+        prefix = "clipboard_content:"
+        if not message.startswith(prefix):
+            logger.error(f"❌ Message doesn't start with expected prefix: {repr(message[:20])}")
+            return
+        
+        mac_content = message[len(prefix):]  # Use len() instead of hardcoded 18
+        logger.debug(f"🔍 Extracted content: {repr(mac_content)}")
+        
         if not mac_content or mac_content == last_windows_clipboard:
+            logger.debug("🔍 No update needed - content is empty or unchanged")
             return  # No update needed
 
         # Update Windows clipboard with UTF-8 content
         try:
+            logger.info(f"📋 Updating Windows clipboard with: {mac_content[:50]}...")
             pyperclip.copy(mac_content)
             last_windows_clipboard = mac_content
-            logger.success(f"📋 Updated Windows clipboard: {mac_content[:50]}...")
+            logger.success(f"✅ Windows clipboard updated successfully: {mac_content[:50]}...")
+                
         except Exception as clipboard_error:
             if "could not find a copy/paste mechanism" in str(clipboard_error).lower():
                 logger.warning(
@@ -143,8 +186,11 @@ def _handle_clipboard_content(message):
                 raise clipboard_error
     except UnicodeDecodeError as e:
         logger.error(f"❌ Failed to decode Mac clipboard content as UTF-8: {e}")
+        logger.error(f"❌ Problematic bytes: {repr(message) if isinstance(message, bytes) else 'N/A'}")
     except Exception as e:
         logger.error(f"❌ Failed to handle Mac clipboard update: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
 
 
 def on_message(ws, message):

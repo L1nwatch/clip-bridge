@@ -2,6 +2,32 @@
 # -*- coding: utf-8 -*-
 # clipboard_server.py
 
+import os
+import sys
+
+# Force UTF-8 encoding for all I/O operations - MUST be at the top
+import locale
+try:
+    # Set locale to UTF-8
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+except locale.Error:
+    try:
+        # Fallback for different systems
+        locale.setlocale(locale.LC_ALL, 'UTF-8')
+    except locale.Error:
+        pass  # Use system default if UTF-8 not available
+
+# Force environment encoding
+os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+os.environ.setdefault('LANG', 'en_US.UTF-8')
+os.environ.setdefault('LC_ALL', 'en_US.UTF-8')
+
+# Force stdout/stderr to use UTF-8
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 from flask import Flask, request
 import threading
 import os
@@ -111,8 +137,19 @@ def _handle_websocket_message(ws, message, client_addr):
         # Client is requesting current clipboard content
         current_clipboard = get_clipboard()
         response = f"clipboard_content:{current_clipboard}"
+        
+        # Debug: log the response before encoding
+        logger.debug(f"🔍 Response before encoding: {repr(response)}")
+        logger.debug(f"🔍 Response type: {type(response)}")
+        
         # Ensure response is sent as UTF-8
-        ws.send(response.encode("utf-8") if isinstance(response, str) else response)
+        if isinstance(response, str):
+            encoded_response = response.encode("utf-8")
+            logger.debug(f"🔍 Encoded response: {repr(encoded_response)}")
+            ws.send(encoded_response)
+        else:
+            ws.send(response)
+            
         logger.info(f"📋 Sent clipboard content to client: {current_clipboard[:50]}...")
     elif message.startswith("clipboard_update:"):
         # Extract clipboard content from the message

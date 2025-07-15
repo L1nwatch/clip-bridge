@@ -464,6 +464,11 @@ ipcMain.handle('start-server', async (event, config) => {
       PORT: config.port.toString(),
       LOG_LEVEL: config.logLevel || 'INFO',
       PYTHONUNBUFFERED: '1',  // Force unbuffered output
+      // Force UTF-8 encoding for all Python processes
+      PYTHONIOENCODING: 'utf-8',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+      LC_CTYPE: 'UTF-8',
     };
     
     // Only add PYTHONPATH in development
@@ -723,7 +728,12 @@ ipcMain.handle('start-client', async (event, config) => {
       SERVER_HOST: config.serverAddress,
       SERVER_PORT: config.port.toString(),
       LOG_LEVEL: config.logLevel || 'INFO',
-      PYTHONUNBUFFERED: '1'
+      PYTHONUNBUFFERED: '1',
+      // Force UTF-8 encoding for all Python processes
+      PYTHONIOENCODING: 'utf-8',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+      LC_CTYPE: 'UTF-8',
     };
     
     // Only add PYTHONPATH in development
