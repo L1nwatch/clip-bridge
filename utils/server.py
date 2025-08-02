@@ -473,7 +473,11 @@ def notify_clients():
 @app.route("/")
 def health_check():
     """Health check endpoint."""
-    response_data = {"status": "ok", "service": "ClipBridge Server", "version": "0.1.13"}
+    response_data = {
+        "status": "ok",
+        "service": "ClipBridge Server",
+        "version": "0.1.13",
+    }
     response = app.response_class(
         response=app.json.dumps(response_data, ensure_ascii=False),
         status=200,
