@@ -274,8 +274,10 @@ close access imageFile""",
                 logger.error(f"Fallback clipboard access failed: {e}")
                 return None
 
+        clipboard_opened = False
         try:
             win32clipboard.OpenClipboard()
+            clipboard_opened = True
 
             # Try to get image first
             if win32clipboard.IsClipboardFormatAvailable(win32con.CF_DIB):
@@ -288,7 +290,6 @@ close access imageFile""",
                             "size": image.size,
                             "mode": image.mode,
                         }
-                        win32clipboard.CloseClipboard()
                         return ClipboardData(image, "image", metadata)
                 except Exception as e:
                     logger.debug(f"Failed to get image from clipboard: {e}")
@@ -296,25 +297,28 @@ close access imageFile""",
             # Try to get text
             if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
                 text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-                win32clipboard.CloseClipboard()
                 if text:
                     return ClipboardData(text, "text")
             elif win32clipboard.IsClipboardFormatAvailable(win32con.CF_TEXT):
                 text = win32clipboard.GetClipboardData(win32con.CF_TEXT)
-                win32clipboard.CloseClipboard()
                 if text:
                     return ClipboardData(text.decode("utf-8", errors="ignore"), "text")
 
-            win32clipboard.CloseClipboard()
             return None
 
         except Exception as e:
-            try:
-                win32clipboard.CloseClipboard()
-            except Exception:
-                pass
             logger.error(f"Windows clipboard error: {e}")
             return None
+        finally:
+            # Ensure clipboard is closed only if we opened it
+            if clipboard_opened:
+                try:
+                    win32clipboard.CloseClipboard()
+                except Exception as close_error:
+                    logger.debug(
+                        f"Failed to close clipboard (this is usually harmless): {close_error}"
+                    )
+                    pass
 
     def _set_windows_clipboard(self, clipboard_data: ClipboardData) -> bool:
         """Set clipboard content on Windows."""
@@ -349,8 +353,10 @@ close access imageFile""",
                     logger.debug(f"Fallback image description failed: {e}")
                 return False
 
+        clipboard_opened = False
         try:
             win32clipboard.OpenClipboard()
+            clipboard_opened = True
             win32clipboard.EmptyClipboard()
 
             if clipboard_data.data_type == "text":
@@ -364,16 +370,21 @@ close access imageFile""",
                 data = output.getvalue()[14:]  # Remove BMP header
                 win32clipboard.SetClipboardData(win32con.CF_DIB, data)
 
-            win32clipboard.CloseClipboard()
             return True
 
         except Exception as e:
-            try:
-                win32clipboard.CloseClipboard()
-            except Exception:
-                pass
             logger.error(f"Failed to set Windows clipboard: {e}")
             return False
+        finally:
+            # Ensure clipboard is closed only if we opened it
+            if clipboard_opened:
+                try:
+                    win32clipboard.CloseClipboard()
+                except Exception as close_error:
+                    logger.debug(
+                        f"Failed to close clipboard (this is usually harmless): {close_error}"
+                    )
+                    pass
 
 
 # Global clipboard instance

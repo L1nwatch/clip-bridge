@@ -194,14 +194,44 @@ def monitor_windows_clipboard():
                 "(likely CI environment)"
             )
             return
+        elif "clipboard open" in str(e).lower():
+            logger.warning(
+                "🔕 Clipboard monitoring disabled - clipboard access issue "
+                "(may be in use by another application)"
+            )
+            return
         else:
             logger.error(f"❌ Failed to initialize clipboard monitoring: {e}")
             return
 
     while running:
         try:
-            # Check clipboard content
-            current_clipboard_data = get_clipboard()
+            # Check clipboard content with retry logic
+            current_clipboard_data = None
+            retry_count = 0
+            max_retries = 3
+
+            while retry_count < max_retries and current_clipboard_data is None:
+                try:
+                    current_clipboard_data = get_clipboard()
+                    break
+                except Exception as clipboard_error:
+                    retry_count += 1
+                    if "clipboard open" in str(clipboard_error).lower():
+                        logger.debug(
+                            f"Clipboard access retry {retry_count}/{max_retries}: {clipboard_error}"
+                        )
+                        time.sleep(0.5)  # Wait before retry
+                    else:
+                        raise clipboard_error
+
+            if retry_count >= max_retries:
+                logger.warning(
+                    "🔕 Max clipboard access retries reached, skipping this check"
+                )
+                time.sleep(5)  # Wait longer before trying again
+                continue
+
             current_clipboard = (
                 current_clipboard_data.to_json() if current_clipboard_data else ""
             )
@@ -231,6 +261,11 @@ def monitor_windows_clipboard():
                     "🔕 Clipboard monitoring stopped - no system clipboard available"
                 )
                 break
+            elif "clipboard open" in str(e).lower():
+                logger.warning(
+                    f"🔕 Clipboard access issue: {e} - will retry in 5 seconds"
+                )
+                time.sleep(5)  # Wait longer on clipboard access errors
             else:
                 logger.error(f"Error monitoring Windows clipboard: {e}")
                 time.sleep(5)  # Wait longer on error
@@ -288,12 +323,34 @@ def _handle_clipboard_content(message):
                     content_preview = f"image: {size_info}..."
 
                 logger.info(f"📋 Updating Windows clipboard with: {content_preview}")
-                success = set_clipboard(clipboard_data)
+
+                # Retry logic for clipboard setting
+                retry_count = 0
+                max_retries = 3
+                success = False
+
+                while retry_count < max_retries and not success:
+                    try:
+                        success = set_clipboard(clipboard_data)
+                        break
+                    except Exception as clipboard_error:
+                        retry_count += 1
+                        if "clipboard open" in str(clipboard_error).lower():
+                            logger.debug(
+                                f"Clipboard set retry {retry_count}/{max_retries}: {clipboard_error}"
+                            )
+                            time.sleep(0.5)  # Wait before retry
+                        else:
+                            raise clipboard_error
 
                 if success:
                     last_windows_clipboard = mac_content
                     logger.success(
                         f"✅ Windows clipboard updated successfully: {content_preview}"
+                    )
+                elif retry_count >= max_retries:
+                    logger.warning(
+                        "🔕 Max clipboard set retries reached, clipboard may be busy"
                     )
                 else:
                     logger.error("❌ Failed to update Windows clipboard")
@@ -304,12 +361,35 @@ def _handle_clipboard_content(message):
                     f"{mac_content[:50]}..."
                 )
                 text_data = ClipboardData(mac_content, "text")
-                success = set_clipboard(text_data)
+
+                # Retry logic for fallback text setting
+                retry_count = 0
+                max_retries = 3
+                success = False
+
+                while retry_count < max_retries and not success:
+                    try:
+                        success = set_clipboard(text_data)
+                        break
+                    except Exception as clipboard_error:
+                        retry_count += 1
+                        if "clipboard open" in str(clipboard_error).lower():
+                            logger.debug(
+                                f"Clipboard fallback set retry {retry_count}/{max_retries}: {clipboard_error}"
+                            )
+                            time.sleep(0.5)  # Wait before retry
+                        else:
+                            raise clipboard_error
+
                 if success:
                     last_windows_clipboard = mac_content
                     logger.success(
                         f"✅ Windows clipboard updated successfully (text fallback): "
                         f"{mac_content[:50]}..."
+                    )
+                elif retry_count >= max_retries:
+                    logger.warning(
+                        "🔕 Max clipboard fallback set retries reached, clipboard may be busy"
                     )
 
         except Exception as clipboard_error:
@@ -318,6 +398,8 @@ def _handle_clipboard_content(message):
                     "🔕 Cannot update clipboard - no system clipboard available "
                     "(likely CI environment)"
                 )
+            elif "clipboard open" in str(clipboard_error).lower():
+                logger.warning(f"🔕 Clipboard busy - cannot update: {clipboard_error}")
             else:
                 raise clipboard_error
     except UnicodeDecodeError as e:
