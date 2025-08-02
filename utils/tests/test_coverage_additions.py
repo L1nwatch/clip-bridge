@@ -34,11 +34,12 @@ class TestClientCoverage:
         # Test successful initialization
         with patch("client.get_clipboard") as mock_get:
             from client import ClipboardData
-            initial_data = ClipboardData("initial", 'text')
+
+            initial_data = ClipboardData("initial", "text")
             mock_get.return_value = initial_data
-            
+
             # Mock the while loop to exit immediately
-            with patch.object(client, 'running', False):
+            with patch.object(client, "running", False):
                 client.monitor_windows_clipboard()
                 mock_get.assert_called()
 
@@ -46,7 +47,7 @@ class TestClientCoverage:
         with patch("client.get_clipboard") as mock_get:
             clipboard_error = Exception("could not find a copy/paste mechanism")
             mock_get.side_effect = clipboard_error
-            
+
             # Should return early without entering the loop
             client.monitor_windows_clipboard()
             mock_get.assert_called_once()
@@ -54,16 +55,16 @@ class TestClientCoverage:
     def test_monitor_windows_clipboard_loop_error_handling(self):
         """Test clipboard monitoring loop error handling without infinite loop."""
         # We'll test the error handling logic separately
-        
+
         # Test the error handling that happens in the while loop
         clipboard_error = Exception("could not find a copy/paste mechanism")
         other_error = Exception("Some other clipboard error")
-        
+
         # Test clipboard mechanism error (should break)
         error_msg = str(clipboard_error).lower()
         should_break = "could not find a copy/paste mechanism" in error_msg
         assert should_break  # This type of error should break the loop
-        
+
         # Test other error (should continue with sleep)
         error_msg = str(other_error).lower()
         should_break = "could not find a copy/paste mechanism" in error_msg
@@ -75,7 +76,7 @@ class TestClientCoverage:
 
         with patch("client.set_clipboard") as mock_set_clipboard:
             mock_set_clipboard.return_value = True
-            
+
             # Test with empty clipboard content
             client.on_message(mock_ws, "clipboard_content:")
             mock_set_clipboard.assert_not_called()  # Empty content should not update
@@ -240,12 +241,14 @@ class TestServerCoverage:
         """Test Mac clipboard monitoring initialization."""
         with patch("server.get_clipboard") as mock_get:
             from server import ClipboardData
-            initial_data = ClipboardData("initial content", 'text')
+
+            initial_data = ClipboardData("initial content", "text")
             mock_get.return_value = initial_data
-            
+
             # Test that initialization gets current clipboard
             # We'll test just the initialization logic separately
             with patch("server.logger") as mock_logger:
+
                 def mock_monitor():
                     # Just test the initialization part
                     mock_logger.info("🔍 Starting Mac clipboard monitor...")
@@ -254,7 +257,7 @@ class TestServerCoverage:
                         last_clipboard_data.to_json() if last_clipboard_data else ""
                     )
                     return  # Exit instead of entering infinite loop
-                
+
                 mock_monitor()
                 mock_get.assert_called()
                 mock_logger.info.assert_called()
@@ -263,11 +266,11 @@ class TestServerCoverage:
         """Test Mac clipboard monitoring error handling scenarios."""
         # Test error handling logic without infinite loop
         clipboard_error = Exception("Clipboard access failed")
-        
+
         # Test the error recovery logic
         with patch("server.get_clipboard") as mock_get:
             mock_get.side_effect = clipboard_error
-            
+
             # Test that errors are handled (we'll test the error handling logic separately)
             try:
                 server.get_clipboard()
@@ -338,7 +341,8 @@ class TestServerCoverage:
             # Test get_clipboard endpoint
             with patch("server.get_clipboard") as mock_get:
                 from server import ClipboardData
-                test_data = ClipboardData("test content", 'text')
+
+                test_data = ClipboardData("test content", "text")
                 mock_get.return_value = test_data
                 response = client.get("/get_clipboard")
                 assert response.status_code == 200
@@ -349,12 +353,12 @@ class TestServerCoverage:
         # Simple test to ensure functions exist and are callable
         assert callable(server.get_clipboard)
         assert callable(server.set_clipboard)
-        
+
         # Test that functions don't crash when called
         try:
             result = server.get_clipboard()
             # Function should return something (ClipboardData or None)
-            assert result is None or hasattr(result, 'data_type')
+            assert result is None or hasattr(result, "data_type")
         except Exception:
             # It's okay if clipboard isn't available in test environment
             pass

@@ -73,9 +73,10 @@ class TestClipboardServer:
     def test_set_clipboard(self, mock_set_clipboard):
         """Test setting clipboard content."""
         from server import ClipboardData
+
         test_content = "test clipboard content"
-        clipboard_data = ClipboardData(test_content, 'text')
-        
+        clipboard_data = ClipboardData(test_content, "text")
+
         # Call the server's set_clipboard function
         server.set_clipboard(clipboard_data)
 
@@ -88,9 +89,10 @@ class TestClipboardServer:
         mock_set_clipboard.side_effect = Exception("Clipboard access failed")
 
         from server import ClipboardData
+
         test_content = "test content"
-        clipboard_data = ClipboardData(test_content, 'text')
-        
+        clipboard_data = ClipboardData(test_content, "text")
+
         # Should raise exception as the import takes precedence
         with pytest.raises(Exception):
             server.set_clipboard(clipboard_data)
@@ -243,9 +245,9 @@ class TestWebSocketApp:
         # Should be called with ClipboardData object created from the message
         mock_set_clipboard.assert_called_once()
         call_args = mock_set_clipboard.call_args[0][0]
-        assert hasattr(call_args, 'content')
+        assert hasattr(call_args, "content")
         assert call_args.content == test_content
-        assert call_args.data_type == 'text'
+        assert call_args.data_type == "text"
 
     @mock.patch("server.set_clipboard")
     def test_websocket_legacy_message_format(self, mock_set_clipboard):
@@ -279,9 +281,9 @@ class TestWebSocketApp:
         # Should be called with ClipboardData object created from the message
         mock_set_clipboard.assert_called_once()
         call_args = mock_set_clipboard.call_args[0][0]
-        assert hasattr(call_args, 'content')
+        assert hasattr(call_args, "content")
         assert call_args.content == test_content
-        assert call_args.data_type == 'text'
+        assert call_args.data_type == "text"
 
 
 if __name__ == "__main__":

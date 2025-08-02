@@ -169,21 +169,20 @@ def monitor_mac_clipboard():
             )
 
             # Only process if clipboard actually changed and has content
-            if current_clipboard != last_mac_clipboard and current_clipboard.strip():
-                if current_clipboard_data:
-                    if current_clipboard_data.data_type == "text":
-                        content_preview = (
-                            f"text: {str(current_clipboard_data.content)[:30]}..."
-                        )
-                    else:
-                        size_info = current_clipboard_data.metadata.get(
-                            "size", "unknown size"
-                        )
-                        content_preview = f"image: {size_info}..."
-                    logger.info(
-                        f"📋 Mac clipboard changed from: {last_mac_clipboard[:30]}..."
+            if current_clipboard != last_mac_clipboard and current_clipboard_data:
+                if current_clipboard_data.data_type == "text":
+                    content_preview = (
+                        f"text: {str(current_clipboard_data.content)[:30]}..."
                     )
-                    logger.info(f"📋 Mac clipboard changed to: {content_preview}")
+                else:
+                    size_info = current_clipboard_data.metadata.get(
+                        "size", "unknown size"
+                    )
+                    content_preview = f"image: {size_info}..."
+                logger.info(
+                    f"📋 Mac clipboard changed from: {last_mac_clipboard[:30]}..."
+                )
+                logger.info(f"📋 Mac clipboard changed to: {content_preview}")
 
                 last_mac_clipboard = current_clipboard
 

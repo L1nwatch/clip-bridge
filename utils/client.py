@@ -164,21 +164,17 @@ def monitor_windows_clipboard():
                 current_clipboard_data.to_json() if current_clipboard_data else ""
             )
 
-            if (
-                current_clipboard != last_windows_clipboard
-                and current_clipboard.strip()
-            ):
-                if current_clipboard_data:
-                    if current_clipboard_data.data_type == "text":
-                        content_preview = (
-                            f"text: {str(current_clipboard_data.content)[:50]}..."
-                        )
-                    else:
-                        size_info = current_clipboard_data.metadata.get(
-                            "size", "unknown size"
-                        )
-                        content_preview = f"image: {size_info}..."
-                    logger.info(f"📋 Windows clipboard changed to: {content_preview}")
+            if current_clipboard != last_windows_clipboard and current_clipboard_data:
+                if current_clipboard_data.data_type == "text":
+                    content_preview = (
+                        f"text: {str(current_clipboard_data.content)[:50]}..."
+                    )
+                else:
+                    size_info = current_clipboard_data.metadata.get(
+                        "size", "unknown size"
+                    )
+                    content_preview = f"image: {size_info}..."
+                logger.info(f"📋 Windows clipboard changed to: {content_preview}")
 
                 last_windows_clipboard = current_clipboard
 
