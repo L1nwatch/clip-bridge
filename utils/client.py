@@ -133,7 +133,7 @@ ws_connection_global = None
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
-    global running, ws_connection_global
+    global running
     logger.info(f"📡 Received signal {signum}, initiating graceful shutdown...")
     running = False
 

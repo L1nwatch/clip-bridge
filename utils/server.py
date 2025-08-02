@@ -188,7 +188,7 @@ atexit.register(cleanup_on_exit)
 
 def monitor_mac_clipboard():
     """Monitor Mac clipboard for changes and notify clients."""
-    global last_mac_clipboard, running
+    global last_mac_clipboard
     logger.info("🔍 Starting Mac clipboard monitor...")
 
     # Initialize with current clipboard content
