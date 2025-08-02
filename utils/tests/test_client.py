@@ -64,9 +64,12 @@ class TestClipboardClient:
         mock_ws.sock = MagicMock()
         mock_ws.sock.connected = True
 
-        with patch("threading.Thread") as mock_thread, patch(
-            "client.get_clipboard",
-            return_value=client.ClipboardData("test clipboard", "text"),
+        with (
+            patch("threading.Thread") as mock_thread,
+            patch(
+                "client.get_clipboard",
+                return_value=client.ClipboardData("test clipboard", "text"),
+            ),
         ):
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance

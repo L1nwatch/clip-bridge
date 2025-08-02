@@ -197,9 +197,15 @@ jobs:
         
     - name: Create release packages
       run: |
-        # Extract version from package.json
-        VERSION=$(cat package.json | grep '"version":' | sed 's/.*"version": "\(.*\)".*/\1/')
-        echo "Building release for version: $VERSION"
+        # Extract version from git tag
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="v$(date +'%Y.%m.%d-%H%M')"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        # Remove 'v' prefix if present for file naming
+        VERSION_NUMBER="${VERSION#v}"
+        echo "Building release for version: $VERSION (files: $VERSION_NUMBER)"
         
         # Create Windows packages
         cd windows-executables
@@ -215,8 +221,8 @@ jobs:
         ls -la python-tools/
         
         if [ -d "python-tools" ] && [ "$(ls -A python-tools)" ]; then
-          zip -r ../clipbridge-windows-python-tools-${VERSION}.zip python-tools/
-          echo "✅ Created clipbridge-windows-python-tools-${VERSION}.zip"
+          zip -r ../clipbridge-windows-python-tools-${VERSION_NUMBER}.zip python-tools/
+          echo "✅ Created clipbridge-windows-python-tools-${VERSION_NUMBER}.zip"
         else
           echo "❌ No Python executables found for ZIP creation"
           exit 1
@@ -240,11 +246,11 @@ jobs:
         ls -la *.zip *.dmg *.exe 2>/dev/null || echo "Some files may be missing"
         
         # Verify the ZIP file was created
-        if [ -f "clipbridge-windows-python-tools-${VERSION}.zip" ]; then
-          echo "✅ clipbridge-windows-python-tools-${VERSION}.zip is ready for release"
-          unzip -l clipbridge-windows-python-tools-${VERSION}.zip
+        if [ -f "clipbridge-windows-python-tools-${VERSION_NUMBER}.zip" ]; then
+          echo "✅ clipbridge-windows-python-tools-${VERSION_NUMBER}.zip is ready for release"
+          unzip -l clipbridge-windows-python-tools-${VERSION_NUMBER}.zip
         else
-          echo "❌ clipbridge-windows-python-tools-${VERSION}.zip was not created"
+          echo "❌ clipbridge-windows-python-tools-${VERSION_NUMBER}.zip was not created"
           exit 1
         fi
         
@@ -284,7 +290,7 @@ jobs:
         body: |
           # ClipBridge ${{ steps.tag.outputs.tag }} - Enhanced Image Support 🖼️
           
-          ## 🎉 What's New in v0.1.10
+          ## 🎉 What's New in ${{ steps.tag.outputs.tag }}
           
           ### 🖼️ Full Image Clipboard Support
           - **Cross-platform image sharing** - Copy images seamlessly between Windows and macOS

@@ -121,8 +121,9 @@ class TestClientCoverage:
 
     def test_test_server_connectivity_missing_config(self):
         """Test server connectivity check with missing configuration."""
-        with patch.object(client, "SERVER_HOST", ""), patch.object(
-            client, "SERVER_PORT", ""
+        with (
+            patch.object(client, "SERVER_HOST", ""),
+            patch.object(client, "SERVER_PORT", ""),
         ):
 
             result = client.test_server_connectivity()
@@ -164,9 +165,11 @@ class TestClientCoverage:
 
     def test_main_execution_flow(self):
         """Test the main execution flow."""
-        with patch("client.test_server_connectivity") as mock_test, patch(
-            "client.ws_client.WebSocketApp"
-        ) as mock_app, patch("client.ws_client.enableTrace") as mock_trace:
+        with (
+            patch("client.test_server_connectivity") as mock_test,
+            patch("client.ws_client.WebSocketApp") as mock_app,
+            patch("client.ws_client.enableTrace") as mock_trace,
+        ):
 
             mock_test.return_value = True
             mock_ws_instance = MagicMock()
@@ -376,9 +379,10 @@ class TestServerCoverage:
 
     def test_main_execution_flow(self):
         """Test the main execution flow of the server."""
-        with patch("threading.Thread") as mock_thread, patch(
-            "server.pywsgi.WSGIServer"
-        ) as mock_server:
+        with (
+            patch("threading.Thread") as mock_thread,
+            patch("server.pywsgi.WSGIServer") as mock_server,
+        ):
 
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
@@ -413,8 +417,9 @@ class TestIntegrationCoverage:
         mock_client_ws = MagicMock()
         client.ws_connection = mock_client_ws
 
-        with patch("client.set_clipboard") as mock_client_set_clipboard, patch(
-            "server.set_clipboard"
+        with (
+            patch("client.set_clipboard") as mock_client_set_clipboard,
+            patch("server.set_clipboard"),
         ):
             mock_client_set_clipboard.return_value = True
 

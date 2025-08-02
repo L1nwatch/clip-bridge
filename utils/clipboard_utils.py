@@ -160,13 +160,10 @@ class CrossPlatformClipboard:
                         [
                             "osascript",
                             "-e",
-                            f"""
-                        set imageData to the clipboard as «class PNGf»
-                        set imageFile to open for access POSIX file "{temp_path}" \\
-                            with write permission
-                        write imageData to imageFile
-                        close access imageFile
-                        """,
+                            f"""set imageData to the clipboard as «class PNGf»
+set imageFile to open for access POSIX file "{temp_path}" with write permission
+write imageData to imageFile
+close access imageFile""",
                         ],
                         capture_output=True,
                         text=True,
