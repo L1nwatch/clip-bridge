@@ -545,7 +545,7 @@ if __name__ == "__main__":
 
         # Add proper WebSocket headers with UTF-8 encoding
         headers = {
-            "User-Agent": "ClipboardBridge-Client/1.0",
+            "User-Agent": "ClipboardBridge-Client/0.1.12",
             "Accept-Charset": "utf-8",
         }
 

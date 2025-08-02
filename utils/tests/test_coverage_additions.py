@@ -187,7 +187,7 @@ if True:  # Simulate if __name__ == "__main__":
     try:
         import client
         client.ws_client.enableTrace(False)
-        headers = {"User-Agent": "ClipboardBridge-Client/1.0"}
+        headers = {"User-Agent": "ClipboardBridge-Client/0.1.12"}
         ws = client.ws_client.WebSocketApp(
             client.SERVER_URL,
             header=headers,
