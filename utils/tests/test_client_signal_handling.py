@@ -6,9 +6,7 @@ Tests for client signal handling and graceful shutdown functionality.
 import pytest
 import sys
 import os
-import time
 import signal
-import threading
 from unittest.mock import patch, MagicMock
 
 # Add parent directory to path to import our modules

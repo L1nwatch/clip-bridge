@@ -278,17 +278,31 @@ jobs:
           *.exe
           *.dmg
         body: |
-          # ClipBridge ${{ steps.tag.outputs.tag }}
+          # ClipBridge ${{ steps.tag.outputs.tag }} - Enhanced Image Support 🖼️
+          
+          ## 🎉 What's New in v0.1.10
+          
+          ### 🖼️ Full Image Clipboard Support
+          - **Cross-platform image sharing** - Copy images seamlessly between Windows and macOS
+          - **Multiple format support** - PNG, JPEG, BMP, and GIF formats fully supported
+          - **Smart fallback system** - Graceful degradation to text-only mode when needed
+          - **Metadata preservation** - Image size and format information maintained
+          
+          ### ✨ Enhanced Features
+          - **Improved notifications** - Fixed picture display issues in UI
+          - **Better error handling** - Enhanced signal handling and connection management
+          - **Backward compatibility** - Works seamlessly with older text-only clients
+          - **Automatic format detection** - Smart content type recognition
           
           ## Downloads
           
           ### Windows (x64)
-          - **ClipBridge Setup 0.1.0.exe** - Complete Windows application installer with GUI and embedded Python tools
+          - **ClipBridge Setup 0.1.10.exe** - Complete Windows application installer with GUI and embedded Python tools
           - **clipbridge-windows-python-tools.zip** - Standalone Python command-line tools (`clipbridge-server.exe` and `clipbridge-client.exe`)
           - Native Windows x64 executables that don't require Python to be installed
           
           ### macOS (Apple Silicon)
-          - **ClipBridge-0.1.0-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
+          - **ClipBridge-0.1.10-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
           - Native macOS application that doesn't require Python to be installed
           - Includes both GUI interface and embedded server/client functionality
           
@@ -296,7 +310,7 @@ jobs:
           
           ### Windows
           **Option 1: Full Application (Recommended)**
-          1. Download `ClipBridge Setup 0.1.0.exe`
+          1. Download `ClipBridge Setup 0.1.10.exe`
           2. Run the installer and follow the setup wizard
           3. Launch ClipBridge from Start Menu or Desktop shortcut
           
@@ -312,6 +326,25 @@ jobs:
           4. Alternative: Run `sudo xattr -rd com.apple.quarantine /Applications/ClipBridge.app` in Terminal
           5. Launch ClipBridge from Applications - all functionality included
           
+          ## 🖼️ Image Features
+          
+          ### Supported Formats
+          - PNG (lossless, transparency support)
+          - JPEG (compressed, high compatibility)
+          - BMP (Windows bitmap)
+          - GIF (static images)
+          
+          ### Usage
+          - Copy any image on one device → Automatically appears on the other
+          - Screenshot sharing between devices
+          - Design asset collaboration
+          - Mixed content workflows (text + images)
+          
+          ### Performance
+          - Recommended: Images under 10MB for optimal speed
+          - Automatic size warnings for large images
+          - Smart compression and optimization
+          
           > **Note**: This app is not code-signed, so macOS may show security warnings. This is normal for open-source apps distributed outside the App Store.
           
           Built on: ${{ steps.date.outputs.date }}
@@ -322,8 +355,8 @@ jobs:
       if: failure()
       run: |
         gh release create ${{ steps.tag.outputs.tag }} \
-          --title "ClipBridge ${{ steps.tag.outputs.tag }}" \
-          --notes "Cross-platform clipboard synchronization tool - Built on ${{ steps.date.outputs.date }}" \
+          --title "ClipBridge ${{ steps.tag.outputs.tag }} - Enhanced Image Support" \
+          --notes "Cross-platform clipboard synchronization tool with image support - Built on ${{ steps.date.outputs.date }}" \
           clipbridge-windows-x64.zip \
           *.dmg
       env:

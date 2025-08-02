@@ -138,7 +138,7 @@ class CrossPlatformClipboard:
     def _get_macos_clipboard(self) -> Optional[ClipboardData]:
         """Get clipboard content on macOS."""
         try:
-            # First try to get image data
+            # First try to get image data using osascript to write to temp file
             result = subprocess.run(
                 ["osascript", "-e", "the clipboard as «class PNGf»"],
                 capture_output=True,
@@ -148,23 +148,46 @@ class CrossPlatformClipboard:
 
             if result.returncode == 0 and result.stdout.strip():
                 # There's image data in clipboard
-                # Get the raw image data using pbpaste
-                image_result = subprocess.run(
-                    ["pbpaste", "-Prefer", "public.png"], capture_output=True, timeout=5
-                )
-
-                if image_result.returncode == 0 and image_result.stdout:
+                # Use osascript to save image to temp file, then read it
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+                    temp_path = temp_file.name
+                
+                try:
+                    # Use osascript to write image data to file
+                    write_result = subprocess.run([
+                        "osascript", "-e", 
+                        f"""
+                        set imageData to the clipboard as «class PNGf»
+                        set imageFile to open for access POSIX file "{temp_path}" \\
+                            with write permission
+                        write imageData to imageFile
+                        close access imageFile
+                        """
+                    ], capture_output=True, text=True, timeout=10)
+                    
+                    if write_result.returncode == 0 and os.path.exists(temp_path):
+                        # Read the image file
+                        with open(temp_path, 'rb') as f:
+                            image_data = f.read()
+                        
+                        if len(image_data) > 0:
+                            try:
+                                # Convert to PIL Image
+                                image = Image.open(io.BytesIO(image_data))
+                                metadata = {
+                                    "format": "PNG",
+                                    "size": image.size,
+                                    "mode": image.mode,
+                                }
+                                return ClipboardData(image, "image", metadata)
+                            except Exception as e:
+                                logger.debug(f"Failed to process image data: {e}")
+                finally:
+                    # Clean up temp file
                     try:
-                        # Convert to PIL Image
-                        image = Image.open(io.BytesIO(image_result.stdout))
-                        metadata = {
-                            "format": "PNG",
-                            "size": image.size,
-                            "mode": image.mode,
-                        }
-                        return ClipboardData(image, "image", metadata)
-                    except Exception as e:
-                        logger.debug(f"Failed to process image data: {e}")
+                        os.unlink(temp_path)
+                    except:
+                        pass
 
             # If no image or image processing failed, try text
             text_result = subprocess.run(

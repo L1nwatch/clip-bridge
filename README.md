@@ -5,11 +5,13 @@ Electron + React desktop application for sharing clipboard contents across devic
 ## 🚀 Features
 
 - **Cross-platform clipboard sharing** between multiple devices
-- **📋 Text & Image Support** - Copy both text and images across devices
+- **�️ Enhanced Image Support** - Copy and paste images seamlessly across devices with metadata preservation
+- **📋 Text & Rich Content** - Full Unicode text support with automatic encoding handling
 - **Real-time WebSocket communication** for instant updates
 - **Live client connection monitoring** with connected devices display
-- **Modern React UI** with Material-UI components
+- **Modern React UI** with Material-UI components and enhanced notifications
 - **Python backend** with Flask and WebSocket support
+- **Intelligent fallback system** - Gracefully degrades to text-only mode when image support unavailable
 - **Comprehensive test coverage** with 100% test success rate
 - **High-quality code** with automated linting and formatting
 - **Native Windows/macOS executables** via GitHub Actions CI/CD
@@ -71,8 +73,10 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
 
-# For enhanced image clipboard support (optional)
-# pip install pywin32  # Windows only, for better clipboard integration
+# Enhanced image clipboard support is automatically enabled when available
+# On Windows: pywin32 provides better clipboard integration
+# On macOS/Linux: Pillow handles image processing
+# Automatic fallback to text-only mode if image dependencies unavailable
 ```
 
 ### Running the Application
@@ -101,6 +105,39 @@ python demo_clients.py 2 8001  # 2 clients on port 8001
 ```
 
 This will simulate multiple clients connecting to your server, allowing you to see the Connected Clients UI in action.
+
+## 🖼️ Image Clipboard Support
+
+ClipBridge now supports **full image clipboard sharing** across devices with the following capabilities:
+
+### Supported Image Formats
+- **PNG** - Lossless compression, transparency support
+- **JPEG** - Compressed images with excellent compatibility
+- **BMP** - Windows bitmap format
+- **GIF** - Animated and static GIFs (static only for clipboard)
+
+### Smart Fallback System
+- **Enhanced Mode**: Automatic image detection and transfer when dependencies available
+- **Text-Only Mode**: Graceful degradation when image support unavailable (CI environments)
+- **Backward Compatibility**: Works seamlessly with older text-only clients
+
+### Technical Features
+- **Metadata Preservation**: Image size, format, and properties maintained
+- **Efficient Transfer**: Base64 encoding with size optimization
+- **Error Handling**: Robust error recovery with detailed logging
+- **Platform Integration**: Native clipboard API integration on Windows/macOS
+
+### Usage Examples
+```bash
+# Copy an image on Windows → Automatically appears on Mac
+# Copy a screenshot on Mac → Instantly available on Windows
+# Mixed content workflows supported (text + images)
+```
+
+### Image Size Limits
+- **Recommended**: Under 10MB for optimal performance
+- **Maximum**: Limited by available system memory
+- **Auto-notification**: Size warnings for large images in UI
 
 ### Troubleshooting
 
@@ -237,6 +274,10 @@ This project maintains high code quality through:
 - **Error Scenarios**: Comprehensive error handling validation
 
 ### Recent Achievements
+- ✅ **Enhanced Image Clipboard Support** - Full image copy/paste with metadata preservation
+- ✅ **Smart Fallback System** - Graceful degradation to text-only mode when needed
+- ✅ **Picture Notification Fixes** - Resolved image display issues in UI notifications
+- ✅ **Signal Error Resolution** - Fixed client signal handling for graceful shutdowns
 - ✅ Fixed all Python test failures (6 → 0 failures)
 - ✅ Enhanced JavaScript test coverage (+17% improvement)
 - ✅ Added comprehensive integration testing

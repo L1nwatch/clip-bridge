@@ -1,7 +1,7 @@
 {
   "name": "clip-bridge",
-  "version": "0.1.0",
-  "description": "A cross-platform clipboard synchronization tool",
+  "version": "0.1.10",
+  "description": "A cross-platform clipboard synchronization tool with image support",
   "author": "ClipBridge Team",
   "homepage": "./",
   "main": "build/electron.js",
