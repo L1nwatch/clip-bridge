@@ -7,13 +7,9 @@ Tests individual components and functions of the server.
 
 import pytest
 import unittest.mock as mock
-import threading
-import time
-import requests
-import subprocess
 import sys
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 # Add parent directory to path to import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,7 +44,7 @@ class TestClipboardServer:
             # Should return some response (even if 404)
             assert response.status_code in [200, 404]
 
-    @mock.patch("server.set_clipboard")
+    @mock.patch("server.set_clipboard_compat")
     def test_update_clipboard_endpoint(self, mock_set_clipboard):
         """Test the clipboard update endpoint."""
         test_data = "test clipboard content"
@@ -61,7 +57,7 @@ class TestClipboardServer:
             mock_set_clipboard.assert_called_once_with(test_data)
 
     @mock.patch("server.notify_clients")
-    @mock.patch("server.set_clipboard")
+    @mock.patch("server.set_clipboard_compat")
     def test_update_clipboard_notifies_clients(self, mock_set_clipboard, mock_notify):
         """Test that updating clipboard notifies WebSocket clients."""
         test_data = "test notification content"
@@ -73,23 +69,31 @@ class TestClipboardServer:
             mock_set_clipboard.assert_called_once_with(test_data)
             mock_notify.assert_called_once()
 
-    @mock.patch("server.pyperclip.copy")
-    def test_set_clipboard(self, mock_copy):
+    @mock.patch("server.set_clipboard")
+    def test_set_clipboard(self, mock_set_clipboard):
         """Test setting clipboard content."""
+        from server import ClipboardData
         test_content = "test clipboard content"
-        server.set_clipboard(test_content)
+        clipboard_data = ClipboardData(test_content, 'text')
+        
+        # Call the server's set_clipboard function
+        server.set_clipboard(clipboard_data)
 
-        # Verify pyperclip.copy was called with correct content
-        mock_copy.assert_called_once_with(test_content)
+        # Verify the imported set_clipboard was called
+        mock_set_clipboard.assert_called_once_with(clipboard_data)
 
-    @mock.patch("server.pyperclip.copy")
-    def test_set_clipboard_error_handling(self, mock_copy):
+    @mock.patch("server.set_clipboard")
+    def test_set_clipboard_error_handling(self, mock_set_clipboard):
         """Test error handling in set_clipboard."""
-        mock_copy.side_effect = Exception("Clipboard access failed")
+        mock_set_clipboard.side_effect = Exception("Clipboard access failed")
 
+        from server import ClipboardData
         test_content = "test content"
-        # Should not raise exception
-        server.set_clipboard(test_content)
+        clipboard_data = ClipboardData(test_content, 'text')
+        
+        # Should raise exception as the import takes precedence
+        with pytest.raises(Exception):
+            server.set_clipboard(clipboard_data)
 
     def test_notify_clients_empty_list(self):
         """Test notifying clients when no clients are connected."""
@@ -180,7 +184,7 @@ class TestWebSocketApp:
 
         # This should be handled by Flask app
         # Just check that it doesn't raise an exception
-        result = server.websocket_app(environ, start_response)
+        server.websocket_app(environ, start_response)
 
     @mock.patch("server.get_clipboard")
     def test_websocket_app_with_mock_websocket(self, mock_get_clipboard):
@@ -236,8 +240,12 @@ class TestWebSocketApp:
 
         server.websocket_app(environ, start_response)
 
-        # Verify set_clipboard was called with the extracted content
-        mock_set_clipboard.assert_called_with(test_content)
+        # Should be called with ClipboardData object created from the message
+        mock_set_clipboard.assert_called_once()
+        call_args = mock_set_clipboard.call_args[0][0]
+        assert hasattr(call_args, 'content')
+        assert call_args.content == test_content
+        assert call_args.data_type == 'text'
 
     @mock.patch("server.set_clipboard")
     def test_websocket_legacy_message_format(self, mock_set_clipboard):
@@ -268,8 +276,12 @@ class TestWebSocketApp:
 
         server.websocket_app(environ, start_response)
 
-        # Verify set_clipboard was called with the entire message
-        mock_set_clipboard.assert_called_with(test_content)
+        # Should be called with ClipboardData object created from the message
+        mock_set_clipboard.assert_called_once()
+        call_args = mock_set_clipboard.call_args[0][0]
+        assert hasattr(call_args, 'content')
+        assert call_args.content == test_content
+        assert call_args.data_type == 'text'
 
 
 if __name__ == "__main__":

@@ -31,6 +31,9 @@ clipbridge-server.exe
 .vscode/launch.json
 .history/
 
+# Linting configuration
+.flake8
+
 # Coverage
 coverage/
 *.coverage

@@ -45,5 +45,38 @@
   ],
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
+  },
+  
+  // Python environment configuration
+  "python.defaultInterpreterPath": "./.venv/bin/python",
+  "python.venvPath": "./.venv",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  
+  // Terminal configuration to auto-activate virtual environment
+  "terminal.integrated.env.osx": {
+    "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+    "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+  },
+  "terminal.integrated.env.linux": {
+    "VIRTUAL_ENV": "${workspaceFolder}/.venv", 
+    "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+  },
+  "terminal.integrated.env.windows": {
+    "VIRTUAL_ENV": "${workspaceFolder}\\.venv",
+    "PATH": "${workspaceFolder}\\.venv\\Scripts;${env:PATH}"
+  },
+  
+  // Shell integration for automatic venv activation
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "zsh",
+      "args": ["-l"],
+      "env": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    }
   }
 }

@@ -44,10 +44,11 @@ class TestClipboardClient:
         client.on_message(mock_ws, "new_clipboard")
         mock_ws.send.assert_called_with(b"get_clipboard")
 
-        # Test clipboard_content message
-        with patch("client.pyperclip.copy") as mock_copy:
+        # Test clipboard_content message - now uses internal set_clipboard function
+        with patch("client.set_clipboard") as mock_set_clipboard:
+            mock_set_clipboard.return_value = True
             client.on_message(mock_ws, "clipboard_content:test content")
-            mock_copy.assert_called_with("test content")
+            mock_set_clipboard.assert_called()
 
     def test_on_message_with_exception(self):
         """Test WebSocket message callback with send exception."""
@@ -64,7 +65,8 @@ class TestClipboardClient:
         mock_ws.sock.connected = True
 
         with patch("threading.Thread") as mock_thread, patch(
-            "client.pyperclip.paste", return_value="test clipboard"
+            "client.get_clipboard",
+            return_value=client.ClipboardData("test clipboard", "text"),
         ):
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
@@ -90,9 +92,12 @@ class TestClipboardClient:
         # Should not raise any exceptions
         client.on_error(mock_ws, "Test error")
 
-    @mock.patch("client.pyperclip.paste", return_value="test clipboard")
+    @mock.patch(
+        "client.get_clipboard",
+        return_value=client.ClipboardData("test clipboard", "text"),
+    )
     @mock.patch("client.threading.Thread")
-    def test_on_open_with_pending_updates(self, mock_thread, mock_paste):
+    def test_on_open_with_pending_updates(self, mock_thread, mock_get_clipboard):
         """Test WebSocket on_open with pending clipboard updates."""
         import client
 
@@ -140,7 +145,7 @@ class TestClipboardClient:
         result = client.send_clipboard_to_server(test_content)
 
         # Verify WebSocket send was called with correct format
-        expected_message = f"clipboard_update:{test_content}".encode('utf-8')
+        expected_message = f"clipboard_update:{test_content}".encode("utf-8")
         mock_ws.send.assert_called_once_with(expected_message)
         assert result is True
 

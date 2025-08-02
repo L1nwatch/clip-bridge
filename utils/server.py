@@ -34,12 +34,62 @@ import threading
 import os
 import time
 import sys
-import pyperclip
+import json
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
 from loguru import logger
 import loguru
+
+# Import clipboard utilities with fallback
+try:
+    from clipboard_utils import get_clipboard, set_clipboard, ClipboardData
+    logger.info("✨ Enhanced clipboard support (text + images) enabled")
+except ImportError as e:
+    logger.warning(f"Enhanced clipboard not available: {e}")
+    logger.info("📋 Using fallback text-only clipboard support")
+    # Create fallback implementations
+    import pyperclip
+    
+    class ClipboardData:
+        def __init__(self, content, data_type='text', metadata=None):
+            self.content = content
+            self.data_type = data_type
+            self.metadata = metadata or {}
+        
+        def to_json(self):
+            return json.dumps({
+                'content': str(self.content),
+                'data_type': self.data_type,
+                'metadata': self.metadata
+            })
+        
+        @classmethod
+        def from_json(cls, json_str):
+            data = json.loads(json_str)
+            return cls(data['content'], data['data_type'], data['metadata'])
+    
+    def get_clipboard():
+        try:
+            content = pyperclip.paste()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+            elif content is None:
+                content = ""
+            return ClipboardData(content, 'text') if content else None
+        except Exception:
+            return None
+    
+    def set_clipboard(clipboard_data):
+        try:
+            if clipboard_data.data_type == 'image':
+                logger.warning("Image clipboard not supported in fallback mode")
+                return False
+            content = str(clipboard_data.content)
+            pyperclip.copy(content)
+            return True
+        except Exception:
+            return False
 
 # Configuration from environment variables
 PORT = int(os.environ.get("PORT", "8000"))  # Server default port
@@ -96,20 +146,33 @@ def monitor_mac_clipboard():
     logger.info("🔍 Starting Mac clipboard monitor...")
 
     # Initialize with current clipboard content
-    last_mac_clipboard = get_clipboard(log_retrieval=False)
-    logger.info(f"📋 Initial Mac clipboard: {last_mac_clipboard[:50]}...")
+    last_clipboard_data = get_clipboard()
+    last_mac_clipboard = last_clipboard_data.to_json() if last_clipboard_data else ""
+    if last_clipboard_data:
+        if last_clipboard_data.data_type == 'text':
+            content_preview = f"text: {str(last_clipboard_data.content)[:50]}..."
+        else:
+            size_info = last_clipboard_data.metadata.get('size', 'unknown size')
+            content_preview = f"image: {size_info}..."
+        logger.info(f"📋 Initial Mac clipboard: {content_preview}")
 
     while True:
         try:
-            # Silently check clipboard content
-            current_clipboard = get_clipboard(log_retrieval=False)
+            # Check clipboard content
+            current_clipboard_data = get_clipboard()
+            current_clipboard = current_clipboard_data.to_json() if current_clipboard_data else ""
 
             # Only process if clipboard actually changed and has content
             if current_clipboard != last_mac_clipboard and current_clipboard.strip():
-                logger.info(
-                    f"📋 Mac clipboard changed from: {last_mac_clipboard[:30]}..."
-                )
-                logger.info(f"📋 Mac clipboard changed to: {current_clipboard[:50]}...")
+                if current_clipboard_data:
+                    if current_clipboard_data.data_type == 'text':
+                        content_preview = f"text: {str(current_clipboard_data.content)[:30]}..."
+                    else:
+                        size_info = current_clipboard_data.metadata.get('size', 'unknown size')
+                        content_preview = f"image: {size_info}..."
+                    logger.info(f"📋 Mac clipboard changed from: {last_mac_clipboard[:30]}...")
+                    logger.info(f"📋 Mac clipboard changed to: {content_preview}")
+                
                 last_mac_clipboard = current_clipboard
 
                 # Notify all connected Windows clients
@@ -119,6 +182,51 @@ def monitor_mac_clipboard():
         except Exception as e:
             logger.error(f"Error monitoring Mac clipboard: {e}")
             time.sleep(5)  # Wait longer on error
+
+
+def set_clipboard_compat(data):
+    """
+    Set the clipboard content with enhanced support.
+    """
+    if isinstance(data, str):
+        # Try to parse as JSON first (enhanced data)
+        try:
+            clipboard_data = ClipboardData.from_json(data)
+            success = set_clipboard(clipboard_data)
+            if clipboard_data.data_type == 'text':
+                logger.info(f"Clipboard updated with text: {str(clipboard_data.content)[:50]}...")
+            else:
+                size_info = clipboard_data.metadata.get('size', 'unknown size')
+                logger.info(f"Clipboard updated with image: {size_info}...")
+            return success
+        except (json.JSONDecodeError, ValueError):
+            # Fallback to text
+            text_data = ClipboardData(data, 'text')
+            success = set_clipboard(text_data)
+            logger.info(f"Clipboard updated with text (fallback): {data[:50]}...")
+            return success
+    else:
+        # Convert non-string data to text
+        text_data = ClipboardData(str(data), 'text')
+        success = set_clipboard(text_data)
+        logger.info(f"Clipboard updated with converted text: {str(data)[:50]}...")
+        return success
+
+
+def get_clipboard_compat(log_retrieval=True):
+    """
+    Get the current clipboard content with enhanced support.
+    """
+    clipboard_data = get_clipboard()
+    if clipboard_data:
+        if log_retrieval:
+            if clipboard_data.data_type == 'text':
+                logger.info(f"Retrieved clipboard text: {str(clipboard_data.content)[:50]}...")
+            else:
+                size_info = clipboard_data.metadata.get('size', 'unknown size')
+                logger.info(f"Retrieved clipboard image: {size_info}...")
+        return clipboard_data.to_json()
+    return ""
 
 
 def _handle_websocket_message(ws, message, client_addr):
@@ -136,8 +244,11 @@ def _handle_websocket_message(ws, message, client_addr):
         logger.debug("Sent pong response")
     elif message == "get_clipboard":
         # Client is requesting current clipboard content
-        current_clipboard = get_clipboard()
-        response = f"clipboard_content:{current_clipboard}"
+        current_clipboard_data = get_clipboard()
+        if current_clipboard_data:
+            response = f"clipboard_content:{current_clipboard_data.to_json()}"
+        else:
+            response = "clipboard_content:"
 
         # Debug: log the response before encoding
         logger.debug(f"🔍 Response before encoding: {repr(response)}")
@@ -151,19 +262,41 @@ def _handle_websocket_message(ws, message, client_addr):
         else:
             ws.send(response)
 
-        logger.info(f"📋 Sent clipboard content to client: {current_clipboard[:50]}...")
+        if current_clipboard_data:
+            if current_clipboard_data.data_type == 'text':
+                content_preview = f"text: {str(current_clipboard_data.content)[:50]}..."
+            else:
+                size_info = current_clipboard_data.metadata.get('size', 'unknown size')
+                content_preview = f"image: {size_info}..."
+            logger.info(f"📋 Sent clipboard content to client: {content_preview}")
+        else:
+            logger.info("📋 Sent empty clipboard content to client")
     elif message.startswith("clipboard_update:"):
         # Extract clipboard content from the message
-        clipboard_content = message[len("clipboard_update:") :]
-        logger.info(
-            f"📋 Received clipboard update via WebSocket: {clipboard_content[:50]}..."
-        )
-        set_clipboard(clipboard_content)
+        clipboard_content_str = message[len("clipboard_update:") :]
+        logger.info(f"📋 Received clipboard update via WebSocket: {clipboard_content_str[:50]}...")
+        
+        try:
+            # Try to parse as enhanced clipboard data (JSON)
+            clipboard_data = ClipboardData.from_json(clipboard_content_str)
+            set_clipboard(clipboard_data)
+            if clipboard_data.data_type == 'text':
+                content_preview = f"text: {str(clipboard_data.content)[:50]}..."
+            else:
+                size_info = clipboard_data.metadata.get('size', 'unknown size')
+                content_preview = f"image: {size_info}..."
+            logger.info(f"📋 Set clipboard: {content_preview}")
+        except (json.JSONDecodeError, ValueError):
+            # Fallback to text-only if JSON parsing fails
+            text_data = ClipboardData(clipboard_content_str, 'text')
+            set_clipboard(text_data)
+            logger.info(f"📋 Set text clipboard (fallback): {clipboard_content_str[:50]}...")
     else:
         # Legacy format - treat entire message as clipboard content
         if not message.startswith(("pong", "ping")):
             logger.info(f"📋 Received legacy clipboard message: {message[:50]}...")
-            set_clipboard(message)
+            text_data = ClipboardData(message, 'text')
+            set_clipboard(text_data)
 
 
 def _process_websocket_messages(ws, client_addr):
@@ -271,48 +404,6 @@ def notify_clients():
             )
 
 
-def set_clipboard(data):
-    """
-    Set the clipboard content (cross-platform) with UTF-8 encoding.
-    """
-    try:
-        # Ensure data is properly encoded as UTF-8 string
-        if isinstance(data, bytes):
-            data = data.decode("utf-8")
-        elif not isinstance(data, str):
-            data = str(data)
-
-        pyperclip.copy(data)
-        logger.info(f"Clipboard updated with: {data[:50]}...")
-    except UnicodeDecodeError as e:
-        logger.error(f"Failed to decode clipboard data as UTF-8: {e}")
-    except Exception as e:
-        logger.error(f"Failed to set clipboard: {e}")
-
-
-def get_clipboard(log_retrieval=True):
-    """
-    Get the current clipboard content (cross-platform) with UTF-8 encoding.
-    """
-    try:
-        content = pyperclip.paste()
-        # Ensure content is properly handled as UTF-8 string
-        if isinstance(content, bytes):
-            content = content.decode("utf-8")
-        elif content is None:
-            content = ""
-
-        if log_retrieval:
-            logger.info(f"Retrieved clipboard content: {content[:50]}...")
-        return content
-    except UnicodeDecodeError as e:
-        logger.error(f"Failed to decode clipboard content as UTF-8: {e}")
-        return ""
-    except Exception as e:
-        logger.error(f"Failed to get clipboard: {e}")
-        return ""
-
-
 @app.route("/")
 def health_check():
     """Health check endpoint."""
@@ -343,9 +434,9 @@ def health_endpoint():
 
 @app.route("/get_clipboard", methods=["GET"])
 def get_clipboard_content():
-    """Get current clipboard content with UTF-8 encoding."""
+    """Get current clipboard content with enhanced support."""
     try:
-        content = get_clipboard(log_retrieval=True)  # Log when explicitly requested
+        content = get_clipboard_compat(log_retrieval=True)  # Log when explicitly requested
         logger.info(f"Sending clipboard content: {content[:50]}...")
         # Ensure response is UTF-8 encoded
         response = app.response_class(content, mimetype="text/plain; charset=utf-8")
@@ -386,7 +477,7 @@ def update_clipboard():
 
         if content:
             # Update Mac clipboard with content from Windows
-            set_clipboard(content)
+            set_clipboard_compat(content)
             windows_clip = content
             logger.info(f"✅ Updated Mac clipboard with: {content[:50]}...")
 

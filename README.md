@@ -5,6 +5,7 @@ Electron + React desktop application for sharing clipboard contents across devic
 ## 🚀 Features
 
 - **Cross-platform clipboard sharing** between multiple devices
+- **📋 Text & Image Support** - Copy both text and images across devices
 - **Real-time WebSocket communication** for instant updates
 - **Live client connection monitoring** with connected devices display
 - **Modern React UI** with Material-UI components
@@ -12,6 +13,7 @@ Electron + React desktop application for sharing clipboard contents across devic
 - **Comprehensive test coverage** with 100% test success rate
 - **High-quality code** with automated linting and formatting
 - **Native Windows/macOS executables** via GitHub Actions CI/CD
+- **Backward compatibility** with text-only clients
 
 ## 📦 Building for Windows
 
@@ -68,6 +70,9 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cd ..
+
+# For enhanced image clipboard support (optional)
+# pip install pywin32  # Windows only, for better clipboard integration
 ```
 
 ### Running the Application

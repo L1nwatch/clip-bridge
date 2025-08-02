@@ -24,7 +24,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logger.remove()
 logger.add(
     lambda msg: print(msg, end=""),
-    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>INTEGRATION</cyan> - <level>{message}</level>",
+    format=(
+        "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+        "<cyan>INTEGRATION</cyan> - <level>{message}</level>"
+    ),
     level="INFO",
     colorize=True,
 )
@@ -65,7 +68,7 @@ class TestClipboardBridgeIntegration:
                 pytest.fail(f"Server failed to start: {output}")
 
             try:
-                response = requests.get("http://localhost:8002", timeout=1)
+                requests.get("http://localhost:8002", timeout=1)
                 server_started = True
                 logger.success("✅ Test server started successfully")
                 break
