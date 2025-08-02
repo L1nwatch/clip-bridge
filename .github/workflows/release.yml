@@ -197,32 +197,36 @@ jobs:
         
     - name: Create release packages
       run: |
+        # Extract version from package.json
+        VERSION=$(cat package.json | grep '"version":' | sed 's/.*"version": "\(.*\)".*/\1/')
+        echo "Building release for version: $VERSION"
+        
         # Create Windows packages
         cd windows-executables
         
-        # Create Python executables ZIP
+        # Create Python executables ZIP with version
         mkdir python-tools
         # Copy Python executables from the correct path structure
         find . -name "clipbridge-server.exe" -exec cp {} python-tools/ \;
         find . -name "clipbridge-client.exe" -exec cp {} python-tools/ \;
         
-        # Verify files were copied and create ZIP
+        # Verify files were copied and create ZIP with version
         echo "Files in python-tools directory:"
         ls -la python-tools/
         
         if [ -d "python-tools" ] && [ "$(ls -A python-tools)" ]; then
-          zip -r ../clipbridge-windows-python-tools.zip python-tools/
-          echo "✅ Created clipbridge-windows-python-tools.zip"
+          zip -r ../clipbridge-windows-python-tools-${VERSION}.zip python-tools/
+          echo "✅ Created clipbridge-windows-python-tools-${VERSION}.zip"
         else
           echo "❌ No Python executables found for ZIP creation"
           exit 1
         fi
         
-        # Copy Windows installer to root
+        # Copy Windows installer to root (already has version from electron-builder)
         cp electron/*.exe ../ 2>/dev/null || echo "No Windows installer found"
         cd ..
         
-        # Copy DMG file to root for release
+        # Copy DMG file to root for release (already has version from electron-builder)
         cd macos-complete
         cp electron/*.dmg ../ 2>/dev/null || echo "No DMG files found"
         cd ..
@@ -236,11 +240,11 @@ jobs:
         ls -la *.zip *.dmg *.exe 2>/dev/null || echo "Some files may be missing"
         
         # Verify the ZIP file was created
-        if [ -f "clipbridge-windows-python-tools.zip" ]; then
-          echo "✅ clipbridge-windows-python-tools.zip is ready for release"
-          unzip -l clipbridge-windows-python-tools.zip
+        if [ -f "clipbridge-windows-python-tools-${VERSION}.zip" ]; then
+          echo "✅ clipbridge-windows-python-tools-${VERSION}.zip is ready for release"
+          unzip -l clipbridge-windows-python-tools-${VERSION}.zip
         else
-          echo "❌ clipbridge-windows-python-tools.zip was not created"
+          echo "❌ clipbridge-windows-python-tools-${VERSION}.zip was not created"
           exit 1
         fi
         
@@ -274,7 +278,7 @@ jobs:
         prerelease: false
         generate_release_notes: true
         files: |
-          clipbridge-windows-python-tools.zip
+          clipbridge-windows-python-tools-*.zip
           *.exe
           *.dmg
         body: |
@@ -297,12 +301,12 @@ jobs:
           ## Downloads
           
           ### Windows (x64)
-          - **ClipBridge Setup 0.1.10.exe** - Complete Windows application installer with GUI and embedded Python tools
-          - **clipbridge-windows-python-tools.zip** - Standalone Python command-line tools (`clipbridge-server.exe` and `clipbridge-client.exe`)
+          - **ClipBridge Setup ${{ steps.tag.outputs.tag }}.exe** - Complete Windows application installer with GUI and embedded Python tools
+          - **clipbridge-windows-python-tools-${{ steps.tag.outputs.tag }}.zip** - Standalone Python command-line tools (`clipbridge-server.exe` and `clipbridge-client.exe`)
           - Native Windows x64 executables that don't require Python to be installed
           
           ### macOS (Apple Silicon)
-          - **ClipBridge-0.1.10-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
+          - **ClipBridge-${{ steps.tag.outputs.tag }}-arm64.dmg** - Complete macOS application with GUI and embedded Python tools
           - Native macOS application that doesn't require Python to be installed
           - Includes both GUI interface and embedded server/client functionality
           
@@ -310,12 +314,12 @@ jobs:
           
           ### Windows
           **Option 1: Full Application (Recommended)**
-          1. Download `ClipBridge Setup 0.1.10.exe`
+          1. Download `ClipBridge Setup ${{ steps.tag.outputs.tag }}.exe`
           2. Run the installer and follow the setup wizard
           3. Launch ClipBridge from Start Menu or Desktop shortcut
           
           **Option 2: Standalone Tools**
-          1. Download `clipbridge-windows-python-tools.zip`
+          1. Download `clipbridge-windows-python-tools-${{ steps.tag.outputs.tag }}.zip`
           2. Extract the files to a directory of your choice
           3. Run the executables directly (`clipbridge-server.exe` or `clipbridge-client.exe`)
           

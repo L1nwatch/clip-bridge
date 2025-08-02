@@ -37,7 +37,8 @@
     "entitlements": "assets/entitlements.mac.plist",
     "entitlementsInherit": "assets/entitlements.mac.inherit.plist",
     "identity": null,
-    "type": "development"
+    "type": "development",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "win": {
     "target": [
