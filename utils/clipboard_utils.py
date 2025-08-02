@@ -9,6 +9,7 @@ macOS and Windows, supporting both text and image content.
 
 import os
 import platform
+import subprocess
 import tempfile
 import base64
 import io
@@ -18,9 +19,7 @@ from PIL import Image
 from loguru import logger
 
 # Platform-specific imports
-if platform.system() == "Darwin":  # macOS
-    import subprocess
-elif platform.system() == "Windows":
+if platform.system() == "Windows":
     try:
         import win32clipboard
         import win32con
@@ -207,7 +206,10 @@ class CrossPlatformClipboard:
                         [
                             "osascript",
                             "-e",
-                            f'set the clipboard to (read POSIX file "{temp_file.name}" as «class PNGf»)',
+                            (
+                                f'set the clipboard to (read POSIX file '
+                                f'"{temp_file.name}" as «class PNGf»)'
+                            ),
                         ],
                         timeout=5,
                     )
