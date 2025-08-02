@@ -361,7 +361,7 @@ class TestServerCoverage:
 
     def test_set_clipboard_error_handling(self):
         """Test set_clipboard error handling."""
-        with patch("clipboard_utils.subprocess.Popen") as mock_popen:
+        with patch("subprocess.Popen") as mock_popen:
             mock_process = MagicMock()
             mock_process.returncode = 1  # Simulate failure
             mock_popen.return_value = mock_process

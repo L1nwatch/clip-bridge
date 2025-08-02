@@ -185,7 +185,7 @@ class TestCrossPlatformClipboard:
         clipboard = CrossPlatformClipboard()
         assert clipboard.platform == "Darwin"
 
-    @patch('clipboard_utils.subprocess.run')
+    @patch('subprocess.run')
     @patch('platform.system')
     def test_get_macos_text_clipboard(self, mock_platform, mock_subprocess):
         """Test getting text from macOS clipboard."""
@@ -200,7 +200,7 @@ class TestCrossPlatformClipboard:
         assert result.content == "Hello from macOS"
         assert result.data_type == "text"
 
-    @patch('clipboard_utils.subprocess.run')
+    @patch('subprocess.run')
     @patch('platform.system')
     def test_get_macos_clipboard_error(self, mock_platform, mock_subprocess):
         """Test macOS clipboard access error handling."""
@@ -212,7 +212,7 @@ class TestCrossPlatformClipboard:
         
         assert result is None
 
-    @patch('clipboard_utils.subprocess.Popen')
+    @patch('subprocess.Popen')
     @patch('platform.system')
     def test_set_macos_text_clipboard(self, mock_platform, mock_popen):
         """Test setting text to macOS clipboard."""
