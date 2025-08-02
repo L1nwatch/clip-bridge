@@ -1,6 +1,6 @@
 {
   "name": "clip-bridge",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "A cross-platform clipboard synchronization tool with image support",
   "author": "ClipBridge Team",
   "homepage": "./",

@@ -476,7 +476,7 @@ def health_check():
     response_data = {
         "status": "ok",
         "service": "ClipBridge Server",
-        "version": "0.1.13",
+        "version": "0.1.14",
     }
     response = app.response_class(
         response=app.json.dumps(response_data, ensure_ascii=False),
@@ -492,7 +492,7 @@ def health_endpoint():
     response_data = {
         "status": "healthy",
         "service": "ClipBridge Server",
-        "version": "0.1.13",
+        "version": "0.1.14",
     }
     response = app.response_class(
         response=app.json.dumps(response_data, ensure_ascii=False),
