@@ -149,27 +149,35 @@ class CrossPlatformClipboard:
             if result.returncode == 0 and result.stdout.strip():
                 # There's image data in clipboard
                 # Use osascript to save image to temp file, then read it
-                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".png", delete=False
+                ) as temp_file:
                     temp_path = temp_file.name
-                
+
                 try:
                     # Use osascript to write image data to file
-                    write_result = subprocess.run([
-                        "osascript", "-e", 
-                        f"""
+                    write_result = subprocess.run(
+                        [
+                            "osascript",
+                            "-e",
+                            f"""
                         set imageData to the clipboard as «class PNGf»
                         set imageFile to open for access POSIX file "{temp_path}" \\
                             with write permission
                         write imageData to imageFile
                         close access imageFile
-                        """
-                    ], capture_output=True, text=True, timeout=10)
-                    
+                        """,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+
                     if write_result.returncode == 0 and os.path.exists(temp_path):
                         # Read the image file
-                        with open(temp_path, 'rb') as f:
+                        with open(temp_path, "rb") as f:
                             image_data = f.read()
-                        
+
                         if len(image_data) > 0:
                             try:
                                 # Convert to PIL Image
@@ -186,7 +194,7 @@ class CrossPlatformClipboard:
                     # Clean up temp file
                     try:
                         os.unlink(temp_path)
-                    except:
+                    except Exception:
                         pass
 
             # If no image or image processing failed, try text
@@ -300,7 +308,7 @@ class CrossPlatformClipboard:
         except Exception as e:
             try:
                 win32clipboard.CloseClipboard()
-            except:
+            except Exception:
                 pass
             logger.error(f"Windows clipboard error: {e}")
             return None
@@ -343,7 +351,7 @@ class CrossPlatformClipboard:
         except Exception as e:
             try:
                 win32clipboard.CloseClipboard()
-            except:
+            except Exception:
                 pass
             logger.error(f"Failed to set Windows clipboard: {e}")
             return False

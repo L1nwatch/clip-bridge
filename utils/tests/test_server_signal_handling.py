@@ -142,20 +142,23 @@ class TestServerSignalHandling:
         with patch("server.get_clipboard") as mock_get_clipboard:
             with patch("server.notify_clients") as mock_notify:
                 with patch("time.sleep") as mock_sleep:
-                    # Mock clipboard data - make initial and current different 
+                    # Mock clipboard data - make initial and current different
                     # to trigger notify_clients
                     mock_initial_data = MagicMock()
                     mock_initial_data.to_json.return_value = '{"test": "initial"}'
                     mock_initial_data.data_type = "text"
                     mock_initial_data.content = "initial content"
-                    
+
                     mock_current_data = MagicMock()
                     mock_current_data.to_json.return_value = '{"test": "changed"}'
                     mock_current_data.data_type = "text"
                     mock_current_data.content = "changed content"
-                    
+
                     # Return initial data first, then changed data
-                    mock_get_clipboard.side_effect = [mock_initial_data, mock_current_data]
+                    mock_get_clipboard.side_effect = [
+                        mock_initial_data,
+                        mock_current_data,
+                    ]
 
                     # Set up the loop to run only once by changing running to False after sleep
                     def set_running_false(*args):

@@ -250,7 +250,8 @@ def set_clipboard_compat(data):
             success = set_clipboard(clipboard_data)
             if clipboard_data.data_type == "text":
                 logger.info(
-                    f"Clipboard updated with text: {str(clipboard_data.content)[:50]}..."
+                    f"Clipboard updated with text: "
+                    f"{str(clipboard_data.content)[:50]}..."
                 )
             else:
                 size_info = clipboard_data.metadata.get("size", "unknown size")
@@ -334,7 +335,8 @@ def _handle_websocket_message(ws, message, client_addr):
         # Extract clipboard content from the message
         clipboard_content_str = message[len("clipboard_update:") :]
         logger.info(
-            f"📋 Received clipboard update via WebSocket: {clipboard_content_str[:50]}..."
+            f"📋 Received clipboard update via WebSocket: "
+            f"{clipboard_content_str[:50]}..."
         )
 
         try:
@@ -418,7 +420,8 @@ def websocket_app(environ, start_response):
             with lock:
                 websocket_clients.discard(ws)
                 logger.info(
-                    f"Client {client_addr} disconnected. Total clients: {len(websocket_clients)}"
+                    f"Client {client_addr} disconnected. "
+                    f"Total clients: {len(websocket_clients)}"
                 )
 
         return []

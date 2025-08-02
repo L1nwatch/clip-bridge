@@ -103,12 +103,21 @@ class TestSignalHandling:
         """Test that global WebSocket reference is set in on_open."""
         mock_ws = MagicMock()
 
-        # Call on_open
-        client.on_open(mock_ws)
+        # Mock threading to prevent background threads from starting
+        with patch("threading.Thread") as mock_thread:
+            mock_thread_instance = MagicMock()
+            mock_thread.return_value = mock_thread_instance
 
-        # Verify global reference is set
-        assert client.ws_connection_global is mock_ws
-        assert client.ws_connection is mock_ws
+            # Call on_open
+            client.on_open(mock_ws)
+
+            # Verify global reference is set
+            assert client.ws_connection_global is mock_ws
+            assert client.ws_connection is mock_ws
+
+            # Verify threads were created but not actually started
+            assert mock_thread.call_count == 2  # monitor_thread and keepalive_thread
+            assert mock_thread_instance.start.call_count == 2
 
     def test_ws_connection_global_cleared_in_on_close(self):
         """Test that global WebSocket reference is cleared in on_close."""

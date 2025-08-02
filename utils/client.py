@@ -300,7 +300,8 @@ def _handle_clipboard_content(message):
             except (json.JSONDecodeError, ValueError):
                 # Fallback to text if JSON parsing fails
                 logger.info(
-                    f"📋 Updating Windows clipboard with text (fallback): {mac_content[:50]}..."
+                    f"📋 Updating Windows clipboard with text (fallback): "
+                    f"{mac_content[:50]}..."
                 )
                 text_data = ClipboardData(mac_content, "text")
                 success = set_clipboard(text_data)
@@ -322,7 +323,8 @@ def _handle_clipboard_content(message):
     except UnicodeDecodeError as e:
         logger.error(f"❌ Failed to decode Mac clipboard content as UTF-8: {e}")
         logger.error(
-            f"❌ Problematic bytes: {repr(message) if isinstance(message, bytes) else 'N/A'}"
+            f"❌ Problematic bytes: "
+            f"{repr(message) if isinstance(message, bytes) else 'N/A'}"
         )
     except Exception as e:
         logger.error(f"❌ Failed to handle Mac clipboard update: {e}")
@@ -468,7 +470,7 @@ def _handle_send_error(e, content):
 
 
 def send_clipboard_to_server(content):
-    """Send Windows clipboard content to Mac server via WebSocket with enhanced support."""
+    """Send Windows clipboard content to Mac server via WebSocket."""
     try:
         # Handle enhanced clipboard content with automatic fallback
         if content and content.startswith('{"content":'):
