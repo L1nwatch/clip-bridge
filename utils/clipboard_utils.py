@@ -93,7 +93,9 @@ class CrossPlatformClipboard:
         logger.info(f"Initializing clipboard handler for {self.platform}")
 
         if self.platform == "Windows" and win32clipboard is None:
-            logger.warning("Windows clipboard API not available, limited functionality")
+            logger.warning("Windows clipboard API not available - install pywin32 for full image support")
+            logger.info("Image clipboard functionality will be limited to text descriptions")
+            logger.info("To enable full image support, run: pip install pywin32")
 
     def get_clipboard_data(self) -> Optional[ClipboardData]:
         """Get current clipboard content (text or image)."""
@@ -324,7 +326,18 @@ close access imageFile""",
                     logger.error(f"Fallback clipboard set failed: {e}")
                     return False
             else:
-                logger.warning("Image clipboard not available without win32clipboard")
+                logger.info("Image clipboard requires pywin32 package. Install with: pip install pywin32")
+                logger.info("Falling back to text-only clipboard functionality")
+                # Try to save image as a file path or description as fallback
+                try:
+                    if hasattr(clipboard_data.content, 'size'):
+                        size_info = f"Image [{clipboard_data.content.size[0]}x{clipboard_data.content.size[1]}]"
+                        import pyperclip
+                        pyperclip.copy(f"Image data: {size_info}")
+                        logger.info(f"Copied image description to clipboard: {size_info}")
+                        return True
+                except Exception as e:
+                    logger.debug(f"Fallback image description failed: {e}")
                 return False
 
         try:

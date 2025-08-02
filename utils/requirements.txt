@@ -14,6 +14,9 @@ websocket-client==1.8.0
 Pillow==10.2.0
 pynput==1.7.6
 
+# Windows-specific clipboard support
+pywin32==308; sys_platform == "win32"
+
 # Build dependencies
 pyinstaller==6.14.2
 
