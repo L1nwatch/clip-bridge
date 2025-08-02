@@ -207,7 +207,7 @@ class CrossPlatformClipboard:
                             "osascript",
                             "-e",
                             (
-                                f'set the clipboard to (read POSIX file '
+                                f"set the clipboard to (read POSIX file "
                                 f'"{temp_file.name}" as «class PNGf»)'
                             ),
                         ],
