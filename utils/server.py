@@ -35,6 +35,8 @@ import os
 import time
 import sys
 import json
+import signal
+import atexit
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
@@ -142,11 +144,51 @@ windows_clip = ""
 websocket_clients = set()
 lock = threading.Lock()
 last_mac_clipboard = ""
+running = True  # Global flag to control server running state
+
+
+def signal_handler(sig, frame):
+    """Handle termination signals gracefully."""
+    global running
+    logger.info(f"📡 Received signal {sig}, initiating graceful shutdown...")
+    running = False
+
+    # Close all WebSocket connections
+    try:
+        for client in list(websocket_clients):
+            try:
+                client.close()
+                logger.debug("Closed WebSocket client connection")
+            except Exception as e:
+                logger.debug(f"Error closing WebSocket client: {e}")
+        websocket_clients.clear()
+    except Exception as e:
+        logger.debug(f"Error during WebSocket cleanup: {e}")
+
+    # Give threads time to cleanup
+    time.sleep(1)
+    logger.info("👋 Server signal handler complete")
+    sys.exit(0)
+
+
+def cleanup_on_exit():
+    """Cleanup function called on normal exit."""
+    global running
+    running = False
+    # Don't log here to avoid loguru cleanup issues during testing
+
+
+# Register signal handlers and cleanup
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+if hasattr(signal, "SIGHUP"):
+    signal.signal(signal.SIGHUP, signal_handler)
+atexit.register(cleanup_on_exit)
 
 
 def monitor_mac_clipboard():
     """Monitor Mac clipboard for changes and notify clients."""
-    global last_mac_clipboard
+    global last_mac_clipboard, running
     logger.info("🔍 Starting Mac clipboard monitor...")
 
     # Initialize with current clipboard content
@@ -160,7 +202,7 @@ def monitor_mac_clipboard():
             content_preview = f"image: {size_info}..."
         logger.info(f"📋 Initial Mac clipboard: {content_preview}")
 
-    while True:
+    while running:
         try:
             # Check clipboard content
             current_clipboard_data = get_clipboard()
@@ -193,6 +235,8 @@ def monitor_mac_clipboard():
         except Exception as e:
             logger.error(f"Error monitoring Mac clipboard: {e}")
             time.sleep(5)  # Wait longer on error
+
+    logger.info("🔍 Mac clipboard monitor stopped")
 
 
 def set_clipboard_compat(data):

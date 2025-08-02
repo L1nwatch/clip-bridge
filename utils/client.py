@@ -33,6 +33,8 @@ import time
 import threading
 import sys
 import json
+import signal
+import atexit
 from loguru import logger
 from loguru import logger as base_logger
 
@@ -124,6 +126,46 @@ ws_connection = None
 last_windows_clipboard = ""
 running = True
 pending_clipboard_updates = []  # Buffer for failed clipboard updates
+
+# Global WebSocket connection reference for signal handling
+ws_connection_global = None
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global running, ws_connection_global
+    logger.info(f"📡 Received signal {signum}, initiating graceful shutdown...")
+    running = False
+
+    # Close WebSocket connection if it exists
+    if ws_connection_global:
+        try:
+            ws_connection_global.close()
+            logger.info("🔌 WebSocket connection closed")
+        except Exception as e:
+            logger.debug(f"Error closing WebSocket: {e}")
+
+    # Give threads time to clean up
+    time.sleep(1)
+    logger.info("👋 Client shutdown complete")
+    sys.exit(0)
+
+
+def cleanup_on_exit():
+    """Cleanup function called on normal exit."""
+    global running
+    running = False
+    logger.debug("🧹 Cleanup function called")
+
+
+# Register signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
+signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
+if hasattr(signal, "SIGHUP"):  # Unix systems only
+    signal.signal(signal.SIGHUP, signal_handler)  # Hangup signal
+
+# Register cleanup function
+atexit.register(cleanup_on_exit)
 
 
 def monitor_windows_clipboard():
@@ -308,8 +350,9 @@ def on_message(ws, message):
 
 
 def on_open(ws):
-    global ws_connection, pending_clipboard_updates
+    global ws_connection, ws_connection_global, pending_clipboard_updates
     ws_connection = ws
+    ws_connection_global = ws  # Set global reference for signal handling
     logger.success("🔗 Connected to Mac server successfully!")
     ui_logger.success("Connected to server successfully")  # Clean message for React UI
 
@@ -341,8 +384,9 @@ def on_open(ws):
 
 
 def on_close(ws, close_status_code, close_msg):
-    global running
+    global running, ws_connection_global
     running = False
+    ws_connection_global = None  # Clear global reference
     logger.warning(
         f"🔌 Disconnected from Mac server "
         f"(Code: {close_status_code}, Message: {close_msg})"
@@ -511,6 +555,10 @@ if __name__ == "__main__":
             on_close=on_close,
             on_error=on_error,
         )
+
+        # Set global reference for signal handling
+        ws_connection_global = ws
+
         logger.info("🔄 Attempting to connect to Mac server...")
         ws.run_forever(ping_interval=30, ping_timeout=10)
     except KeyboardInterrupt:
@@ -521,4 +569,10 @@ if __name__ == "__main__":
         logger.error(f"❌ Client error: {e}")
     finally:
         running = False
+        # Ensure WebSocket is closed
+        if ws_connection_global:
+            try:
+                ws_connection_global.close()
+            except Exception as e:
+                logger.debug(f"Error closing WebSocket in finally: {e}")
         logger.info("👋 Clipboard Bridge Client shutdown complete")
