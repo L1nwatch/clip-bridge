@@ -337,7 +337,8 @@ def _handle_clipboard_content(message):
                         retry_count += 1
                         if "clipboard open" in str(clipboard_error).lower():
                             logger.debug(
-                                f"Clipboard set retry {retry_count}/{max_retries}: {clipboard_error}"
+                                f"Clipboard set retry {retry_count}/{max_retries}: "
+                                f"{clipboard_error}"
                             )
                             time.sleep(0.5)  # Wait before retry
                         else:
@@ -375,7 +376,8 @@ def _handle_clipboard_content(message):
                         retry_count += 1
                         if "clipboard open" in str(clipboard_error).lower():
                             logger.debug(
-                                f"Clipboard fallback set retry {retry_count}/{max_retries}: {clipboard_error}"
+                                f"Clipboard fallback set retry {retry_count}/"
+                                f"{max_retries}: {clipboard_error}"
                             )
                             time.sleep(0.5)  # Wait before retry
                         else:

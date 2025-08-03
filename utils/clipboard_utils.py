@@ -341,7 +341,8 @@ close access imageFile""",
                 # Try to save image as a file path or description as fallback
                 try:
                     if hasattr(clipboard_data.content, "size"):
-                        size_info = f"Image [{clipboard_data.content.size[0]}x{clipboard_data.content.size[1]}]"
+                        content_size = clipboard_data.content.size
+                        size_info = f"Image [{content_size[0]}x{content_size[1]}]"
                         import pyperclip
 
                         pyperclip.copy(f"Image data: {size_info}")
@@ -360,8 +361,10 @@ close access imageFile""",
             win32clipboard.EmptyClipboard()
 
             if clipboard_data.data_type == "text":
-                # Set text content
-                win32clipboard.SetClipboardText(str(clipboard_data.content))
+                # Set text content with proper Unicode support
+                text_content = str(clipboard_data.content)
+                # Use SetClipboardData with CF_UNICODETEXT for proper Unicode handling
+                win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text_content)
 
             elif clipboard_data.data_type == "image":
                 # Convert PIL Image to format suitable for clipboard
